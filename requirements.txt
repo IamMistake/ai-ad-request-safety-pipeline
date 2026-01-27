@@ -1,0 +1,18 @@
+# Kafka
+kafka-python==2.0.2
+
+# Redis client (for shallow fraud detector & coordination)
+redis==5.0.1
+
+faker==20.1.0
+
+python-dateutil==2.8.2
+requests==2.31.0
+
+apache-flink==2.1.1
+
+pyspark==3.5.1
+
+numpy==1.26.4
+pandas==2.2.1
+scikit-learn==1.4.2
