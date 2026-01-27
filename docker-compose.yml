@@ -1,0 +1,84 @@
+services:
+  # --------------------------------------------------
+  # ZOOKEEPER (Confluent, JMX disabled to fix cgroup v2)
+  # --------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_TICK_TIME: 2000
+
+      # FIX: Disable JMX to avoid cgroup v2 crash
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote=false"
+
+    ports:
+      - "2181:2181"
+
+  # --------------------------------------------------
+  # KAFKA BROKER (Confluent, JMX disabled to fix cgroup v2)
+  # --------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"   # internal for UI
+    environment:
+      KAFKA_BROKER_ID: 1
+
+      # Zookeeper connection
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9093,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      # Inter-broker must match INTERNAL
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # Required for single-broker dev mode
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      # FIX: Disable JMX to prevent cgroup error
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote=false"
+
+  # --------------------------------------------------
+  # KAFKA UI
+  # --------------------------------------------------
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9093
+
+  # --------------------------------------------------
+  # REDIS
+  # --------------------------------------------------
+  redis:
+    image: redis:7.2
+    container_name: shallow_fraud_detection
+    ports:
+      - "6379:6379"
+
+  # --------------------------------------------------
+  # REDIS COMMANDER UI
+  # --------------------------------------------------
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: shallow_fraud_detection-commander
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOSTS: local:shallow_fraud_detection:6379
+    ports:
+      - "8081:8081"
