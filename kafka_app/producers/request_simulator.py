@@ -2,15 +2,88 @@ import json
 import random
 import time
 import uuid
-import hashlib
 from kafka import KafkaProducer
 
-TOPIC = "shallow-fraud-detection"
-
-producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
-    value_serializer=lambda v: json.dumps(v).encode("utf-8")
+from kafka_app.producers.models.types import (
+    Conversation,
+    GeoMetadata,
+    ClientMetadata,
+    Metadata,
+    Constraints,
+    AdRequest,
+    RequestAdArgs,
+    to_dict
 )
+
+from kafka_app.producers.services.client_service import build_client_metadata
+from kafka_app.producers.services.geo_service import build_geo_metadata
+
+
+TOPIC = "shallow-fraud-detection"
+BOOTSTRAP = "localhost:9092"
+
+
+producer = KafkaProducer(bootstrap_servers=BOOTSTRAP)
+
+
+def validate_ad_request(req: AdRequest) -> tuple[bool, str]:
+    if not isinstance(req.prompt, str) or len(req.prompt.strip()) < 3:
+        return False, "prompt"
+    if not req.conversation.conversation_id or not req.conversation.session_id or not req.conversation.message_id:
+        return False, "conversation"
+    if req.metadata is None:
+        return False, "metadata"
+    if req.metadata.geo is None and req.metadata.client is None:
+        return False, "metadata_rule"
+    if req.metadata.geo is not None:
+        cc = req.metadata.geo.geo_country
+        if not isinstance(cc, str) or len(cc) != 2 or cc.upper() != cc:
+            return False, "geo_country"
+        if req.metadata.geo.asn is not None and req.metadata.geo.asn <= 0:
+            return False, "asn"
+    if req.constraints is not None:
+        if req.constraints.max_ads < 1 or req.constraints.max_ads > 20:
+            return False, "max_ads"
+        if req.constraints.safe_mode not in ["strict", "standard", "off"]:
+            return False, "safe_mode"
+        if req.constraints.min_similarity_hint is not None:
+            if req.constraints.min_similarity_hint < 0.0 or req.constraints.min_similarity_hint > 1.0:
+                return False, "min_similarity_hint"
+        if req.constraints.max_latency_ms_hint is not None and req.constraints.max_latency_ms_hint < 0:
+            return False, "max_latency_ms_hint"
+    return True, "ok"
+
+
+def simulate_request(args: RequestAdArgs) -> bool:
+    try:
+        conv = args.conversation if isinstance(args.conversation, Conversation) else Conversation(**args.conversation)
+
+        xff = args.x_forwarded_for or "8.8.8.8"
+        geo_dict = build_geo_metadata(xff, args.accept_language)
+        client_dict = build_client_metadata(args.user_agent, xff)
+
+        geo = GeoMetadata(**geo_dict)
+        client = ClientMetadata(**client_dict)
+
+        md = Metadata(geo=geo, client=client)
+
+        req = AdRequest(
+            prompt=args.prompt,
+            conversation=conv,
+            metadata=md,
+            constraints=args.constraints
+        )
+
+        ok, _ = validate_ad_request(req)
+        if not ok:
+            return False
+
+        payload = json.dumps(to_dict(req)).encode("utf-8")
+        producer.send(TOPIC, value=payload)
+        return True
+    except Exception:
+        return False
+
 
 def random_public_ip():
     while True:
@@ -28,96 +101,8 @@ def random_public_ip():
             continue
         return f"{a}.{b}.{c}.{d}"
 
-def sha256_hex(value):
-    return hashlib.sha256(value.encode()).hexdigest()
 
-def detect_os(ua):
-    u = ua.lower()
-    if "windows" in u:
-        return "Windows"
-    if "android" in u:
-        return "Android"
-    if "iphone" in u or "ios" in u:
-        return "iOS"
-    if "mac" in u:
-        return "macOS"
-    if "linux" in u:
-        return "Linux"
-    return "Other"
-
-def detect_browser(ua):
-    u = ua.lower()
-    if "edg" in u:
-        return "Edge"
-    if "chrome" in u and "edg" not in u:
-        return "Chrome"
-    if "firefox" in u:
-        return "Firefox"
-    if "safari" in u and "chrome" not in u:
-        return "Safari"
-    return "Other"
-
-def detect_device(ua):
-    u = ua.lower()
-    if "mobile" in u or "android" in u or "iphone" in u:
-        return "mobile"
-    if "ipad" in u or "tablet" in u:
-        return "tablet"
-    return "desktop"
-
-def build_geo():
-    countries = [
-        ("US", "New York", "NA"),
-        ("DE", "Berlin", "BE"),
-        ("NL", "Amsterdam", "NH"),
-        ("FR", "Paris", "IDF"),
-        ("MK", "Skopje", "SK")
-    ]
-    cc, city, region = random.choice(countries)
-    return {
-        "geo_country": cc,
-        "city": city,
-        "geo_region": region,
-        "asn": random.randint(1000, 60000),
-        "network_type": random.choice(["wifi", "cellular", "ethernet"]),
-        "proxy_vpn_detection": random.random() < 0.08,
-        "language": random.choice(["en-US", "de-DE", "nl-NL", "fr-FR", "mk-MK"])
-    }
-
-def build_client(ua, ip):
-    return {
-        "ip_hash": sha256_hex(ip),
-        "os_family": detect_os(ua),
-        "browser_family": detect_browser(ua),
-        "device_type": detect_device(ua),
-        "referrer": random.choice([
-            "https://www.google.com/",
-            "https://www.youtube.com/",
-            "https://www.reddit.com/",
-            "direct"
-        ]),
-        "x_forwarded_for": ip,
-        "user_agent_hash": sha256_hex(ua),
-        "sdk_version": f"{random.randint(1,4)}.{random.randint(0,10)}.{random.randint(0,20)}"
-    }
-
-def validate(req):
-    if not isinstance(req["prompt"], str) or len(req["prompt"].strip()) < 3:
-        return False
-    geo = req["metadata"]["geo"]
-    if len(geo["geo_country"]) != 2 or geo["geo_country"].upper() != geo["geo_country"]:
-        return False
-    if geo["asn"] <= 0:
-        return False
-    constraints = req.get("constraints")
-    if constraints:
-        if constraints["max_ads"] < 1 or constraints["max_ads"] > 20:
-            return False
-        if constraints["safe_mode"] not in ["strict", "standard", "off"]:
-            return False
-    return True
-
-def generate_request():
+def generate_args() -> RequestAdArgs:
     normal = [
         "How to reset my password?",
         "Explain VLAN in simple terms",
@@ -130,48 +115,58 @@ def generate_request():
         "Credit card generator free",
         "Hack account password instantly"
     ]
+
     prompt = random.choice(fraud if random.random() < 0.25 else normal)
+
+    conv = Conversation(
+        conversation_id=str(uuid.uuid4()),
+        session_id=str(uuid.uuid4()),
+        message_id=str(uuid.uuid4())
+    )
+
     ua_list = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0.0.0",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) Safari/605.1.15",
-        "Mozilla/5.0 (X11; Linux x86_64) Firefox/122.0",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2) Mobile Safari/604.1"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edg/121.0.0.0 Safari/537.36"
     ]
-    ua = random.choice(ua_list)
-    ip = random_public_ip()
-    geo = build_geo()
-    client = build_client(ua, ip)
+
+    accept_langs = [
+        "en-US",
+        "de-DE",
+        "nl-NL",
+        "fr-FR",
+        "mk-MK"
+    ]
+
     constraints = None
     if random.random() < 0.7:
-        constraints = {
-            "max_ads": random.choice([1, 2, 3]),
-            "safe_mode": random.choice(["standard", "strict", "off"]),
-            "min_similarity_hint": random.choice([None, 0.2, 0.5, 0.8]),
-            "max_latency_ms_hint": random.choice([None, 50, 100, 200])
-        }
-    req = {
-        "prompt": prompt,
-        "conversation": {
-            "conversation_id": str(uuid.uuid4()),
-            "session_id": str(uuid.uuid4()),
-            "message_id": str(uuid.uuid4())
-        },
-        "metadata": {
-            "geo": geo,
-            "client": client
-        }
-    }
-    if constraints:
-        req["constraints"] = constraints
-    return req
+        constraints = Constraints(
+            max_ads=random.choice([1, 2, 3]),
+            safe_mode=random.choice(["standard", "strict", "off"]),
+            min_similarity_hint=random.choice([None, 0.2, 0.5, 0.8]),
+            max_latency_ms_hint=random.choice([None, 50, 100, 200])
+        )
 
-def run():
+    return RequestAdArgs(
+        prompt=prompt,
+        conversation=conv,
+        user_agent=random.choice(ua_list),
+        x_forwarded_for=random_public_ip(),
+        accept_language=random.choice(accept_langs),
+        constraints=constraints
+    )
+
+
+def run_simulator():
     while True:
-        req = generate_request()
-        if validate(req):
-            producer.send(TOPIC, req)
-            print("Sent:", req["prompt"])
-        time.sleep(random.uniform(1/30, 1/20))
+        args = generate_args()
+        ok = simulate_request(args)
+        print(args.prompt, ok)
+        time.sleep(random.uniform(1 / 30, 1 / 20))
+
+
 
 if __name__ == "__main__":
-    run()
+    run_simulator()
