@@ -1,5 +1,5 @@
 # Kafka
-kafka-python==2.0.2
+kafka-python==2.3.0
 
 # Redis client (for shallow fraud detector & coordination)
 redis==5.0.1
