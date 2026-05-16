@@ -7,10 +7,18 @@ pipelines for analysis/training.
 ## What's inside
 
 - Kafka request simulator: `kafka/producers/request_simulator.py`
-- Shallow fraud detector (Redis-backed): `redis_service/redis_shallow_fraud.py`
+- Shallow fraud detector (Redis-backed): `shallow_fraud_detection/shallow_fraud_detector.py`
 - Debug consumer: `test_consumer.py`
 - Flink streaming example: `flink_service/fraud_detection.py`
 - Spark training example + sample data: `spark_service/spark_training.py`
+
+## Documentation
+
+The persistent technical documentation for this project lives under `docs/`.
+
+- Start here: `docs/project_overview.md`
+- Architecture: `docs/current_architecture.md`
+- Implementation state: `docs/implementation_status.md`
 
 ## Prerequisites
 
@@ -31,7 +39,7 @@ docker-compose up -d
 pip install -r requirements.txt
 ```
 
-3) Run the request simulator (publishes to Kafka and logs local fraud verdicts)
+3) Run the request simulator prototype
 
 ```bash
 python kafka/producers/request_simulator.py
@@ -55,5 +63,5 @@ python test_consumer.py
 
 - Redis runs locally on `localhost:6379` with no auth.
 - Kafka runs on `localhost:9092`.
-- The simulator generates both normal and fraud-like prompts and uses the
-  Redis shallow detector for local allow/block decisions.
+- The simulator file defines the intended request-generation entry point for the
+  ingestion pipeline.
