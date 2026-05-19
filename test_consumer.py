@@ -1,12 +1,12 @@
 from kafka import KafkaConsumer
 import json
 
-from shallow_fraud_detection.shallow_fraud_detector import ShallowFraudDetector
-
 KAFKA_BOOTSTRAP = "localhost:9092"
 
 TOPICS = [
     "shallow-fraud-detection",
+    "ad.request_raw",
+    "fraud.verdicts",
 ]
 
 def main():
@@ -24,19 +24,19 @@ def main():
         value_deserializer=lambda v: json.loads(v.decode("utf-8"))
     )
 
-    detector = ShallowFraudDetector()
-
     for msg in consumer:
         print("\n------------------------------------------")
         print(f"📩 Topic: {msg.topic}")
         print(f"🕒 Offset: {msg.offset}")
-        print(f"🧩 Message: {json.dumps(msg.value, indent=2)}")
+        print(f"🧩 Message: {json.dumps(msg.value, indent=2)[:800]}")
         print("------------------------------------------\n")
 
-        check_results = detector.check(msg.value)
-        print(check_results)
-
-        # producer send to x
+        if msg.topic == "shallow-fraud-detection":
+            print("placeholder: received ingress request")
+        elif msg.topic == "ad.request_raw":
+            print("placeholder: received shallow-approved request")
+        elif msg.topic == "fraud.verdicts":
+            print("placeholder: received fraud verdict event")
 
 
 if __name__ == "__main__":
