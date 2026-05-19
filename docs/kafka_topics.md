@@ -31,10 +31,10 @@ following fields:
 | Field | Purpose |
 | --- | --- |
 | `prompt` | Text inspected for scam or abuse indicators |
-| `conversation.message_id` | Request-level identifier |
-| `metadata.client.ip_hash` | Client identity for safe frequency analysis |
-| `metadata.client.asn` | Network-level feature for analytics |
-| `metadata.client.device_type` | Device-type feature for analytics |
+| `req_id` | Request-level identifier (random hex) |
+| `request_context.user_ip` | Client IP for safe frequency analysis |
+| `optional_context.asn` | Network-level feature for analytics |
+| `publisher_id` | Traffic source identifier for analytics |
 | `fraud_verdict` | Historical label used in batch training |
 
 ## Consumer Groups

@@ -5,16 +5,65 @@
 This project uses datasets to support offline analytics, model training, and
 evaluation of fraud rules under both normal and suspicious traffic scenarios.
 
-## Current Dataset Location
+## Current Dataset Locations
 
 | Path | Role |
 | --- | --- |
+| `datasets/WildChat/train/` | Real chat-conversation dataset (two Arrow shards, 529k conversations) |
+| `datasets/geo/GeoLite2-City.mmdb` | MaxMind GeoIP database for IP-to-location resolution |
+| `datasets/geo/GeoLite2-Country.mmdb` | MaxMind GeoIP country-only database |
 | `spark_service/data/request_logs.json` | Historical log input for Spark analytics and ML training |
+
+## WildChat Dataset
+
+Source: https://huggingface.co/datasets/allenai/WildChat
+
+WildChat is a corpus of real GPT conversations collected from April 2023.
+It provides:
+
+- **Real prompt text** — the first user turn in each conversation becomes the
+  `prompt` field in the request event (no more synthetic ad-phrase generation).
+- **Built-in moderation labels** — `openai_moderation` and `detoxify_moderation`
+  per turn, plus overall `toxic` and `redacted` flags.
+- **Multi-language support** — 30+ languages (English, Chinese, Russian, French,
+  etc.).
+- **Unique conversation IDs** — all 100k+ IDs are unique (zero duplicates),
+  suitable as session and publisher identifiers.
+- **Two models** — `gpt-3.5-turbo` (64%) and `gpt-4` (36%).
+
+### WildChat Schema (as used by the simulator)
+
+| Column | Type | Simulator mapping |
+|---|---|---|
+| `conversation_id` | string | `session_id`, `publisher_id` |
+| `timestamp` | timestamp[UTC] | `event_time` |
+| `conversation[0].content` | string | `prompt` (first user turn) |
+| `language` | string | `language` |
+| `conversation` | list[struct] | Validated for user role + non-empty content |
+
+### WildChat Row Counts
+
+| Split | Rows |
+|---|---|
+| train (shard 0) | 84,000 |
+| train (shard 1) | 91,238 |
+| Total | 175,238 |
+
+## GeoLite2 Dataset
+
+GeoLite2-City maps IP addresses to geographic location data.
+
+| Use | Details |
+|---|---|
+| Lookup resolution | ~92% of random public IPv4 addresses resolve to a country |
+| Fields used | `country.iso_code`, `subdivisions.most_specific.name`, `city.name` |
+| Fallback | Unresolved IPs → `8.8.8.8` (US, United States) |
 
 ## Current Dataset Direction
 
-The repository currently establishes `request_logs.json` as the canonical batch
-input point for Spark. This should remain the main documented handoff for:
+The repository uses `request_logs.json` as the canonical batch input point for
+Spark. WildChat serves as the live streaming input for the request simulator.
+Both paths should be maintained:
 
 - exported stream history
 - synthetic traffic captures
@@ -35,18 +84,25 @@ Accumulated request logs that include fraud labels or verdicts.
 Curated subsets used to compare rule changes, model versions, or attack-mode
 performance.
 
-## Suggested Record Shape
+## Current Request Record Shape
 
-The current code implies a request record with fields such as:
+The simulator emits events with these top-level fields:
 
 | Field | Use |
 | --- | --- |
+| `req_id` | Random request identity (16-byte hex) |
 | `prompt` | Content-based fraud and moderation analysis |
-| `conversation.message_id` | Request identity |
-| `metadata.client.ip_hash` | Frequency and grouping analysis |
-| `metadata.client.asn` | Network-level feature engineering |
-| `metadata.client.device_type` | Device-based analysis |
-| `fraud_verdict` | Batch training label source |
+| `language` | Per-language fraud and abuse analysis |
+| `request_context.user_ip` | Client IP for frequency and grouping analysis |
+| `request_context.session_id` | Session identity (= WildChat conversation_id) |
+| `request_context.user_agent` | Device and client identification |
+| `optional_context.asn` | Network-level feature engineering |
+| `optional_context.country` | Geo-based feature engineering |
+| `optional_context.region` | Geo-based feature engineering |
+| `optional_context.city` | Geo-based feature engineering |
+| `request_configuration.wrapping_type` | Request format signal (`json`/`txt`/`xml`) |
+| `publisher_id` | Traffic source identity (= WildChat conversation_id) |
+| `fraud_verdict` | Batch training label source (populated downstream) |
 
 ## Label Strategy
 

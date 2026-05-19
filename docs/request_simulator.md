@@ -6,22 +6,26 @@ The request simulator is the synthetic traffic source for the project. It allows
 the team to develop and test the fraud pipeline without depending on production
 traffic.
 
-## Current File
+## Current Files
 
-- `kafka/producers/request_simulator.py`
+| File | Role |
+| --- | --- |
+| `kafka/producers/request_simulator.py` | Main entry point: opens Arrow shards, iterates rows, publishes events |
+| `kafka/producers/simulator_constants.py` | Dataset path, GeoLite2 path, UA list, wrapping types, required source fields |
+| `kafka/producers/simulator_events.py` | `validate_row()` and `build_request_event()` — row → event JSON |
+| `kafka/producers/simulator_lookups.py` | Random IP generation, GeoLite2 resolution, optional_context builder, UA/wrapping pickers |
 
 ## Current Intent In Code
-
-The file defines two main functions:
 
 | Function | Intended role |
 | --- | --- |
 | `simulate_request(args)` | Validate request input, build event JSON, and publish to Kafka |
 | `run_simulator()` | Generate requests continuously and control emission rate |
 
-The simulator now implements this lifecycle by reading the TalkingData CSV,
-mapping dataset columns to the request schema, generating deterministic lookup
-values for missing properties, and publishing JSON events to Kafka.
+The simulator reads the **WildChat** dataset (Arrow IPC format), extracts the
+first user turn as the prompt, enriches each event with a random public IP
+resolved through **GeoLite2-City** for geo context, and publishes JSON events
+to Kafka.
 
 ## Why The Simulator Matters
 
@@ -63,70 +67,83 @@ Examples:
 | Prompt abuse mode | Scam or manipulative prompt generation |
 | Mixed bot mode | Automated traffic blended with normal-looking noise |
 
-## Event Schema Direction
+## Event Schema
 
-The current simulator emits request events with the following shape:
+The simulator emits request events with the following shape:
 
 ```json
 {
-  "event_time": "2017-11-10T04:00:00Z",
-  "req_id": "req_1",
-  "prompt": "Show me a sponsored travel insurance",
+  "event_time": "2023-04-10T00:01:08+00:00",
+  "req_id": "5e87cd8f53dff5e7...",
+  "prompt": "Write a very long, elaborate...",
+  "language": "English",
   "request_context": {
-    "session_id": "sess_4e2f78a921_107",
-    "user_agent": "Mozilla/5.0 ...",
-    "user_ip": "5744"
+    "session_id": "<WildChat conversation_id>",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+    "user_ip": "158.37.13.4"
   },
   "request_configuration": {
     "wrapping_type": "xml"
   },
   "optional_context": {
-    "country": "RS",
-    "region": "Belgrade",
-    "city": "Belgrade",
+    "country": "NO",
+    "region": "Vestland",
+    "city": "Bergen",
     "asn": 64512,
     "age": 29,
     "gender": "female"
   },
-  "publisher_info": {
-    "publisher_id": "pub_107",
-    "publisher_url": "https://publisher-107.example.com"
-  },
-  "source_dataset": {
-    "app": 9,
-    "device": 1,
-    "os": 3,
-    "channel": 107
-  }
+  "publisher_id": "<WildChat conversation_id>"
 }
 ```
 
-## Deterministic Temporary Lookup Strategy
+### Field Origins
 
-Because the source CSV does not include all required request properties, the
-simulator uses deterministic lookup lists generated once at startup with a fixed
-seed.
+| Event field | Source |
+|---|---|
+| `event_time` | WildChat `timestamp` column (UTC, ISO-format) |
+| `req_id` | `secrets.token_hex(16)` — random per event |
+| `prompt` | First user turn's `content` from WildChat `conversation` list |
+| `language` | WildChat `language` column |
+| `request_context.session_id` | WildChat `conversation_id` (unique across all 100k rows) |
+| `request_context.user_agent` | Random pick from the 29-entry `USER_AGENTS` list |
+| `request_context.user_ip` | Random public IPv4 resolved through GeoLite2-City |
+| `request_configuration.wrapping_type` | Random pick from `["json", "txt", "xml"]` |
+| `optional_context.country/region/city` | GeoLite2-City lookup of the random IP |
+| `optional_context.asn` | Synthetic random `int` in `[1000, 65000]` |
+| `optional_context.age` | Synthetic random `int` in `[18, 70]` |
+| `optional_context.gender` | Random pick from `["female", "male"]` |
+| `publisher_id` | WildChat `conversation_id` |
 
-- `app` range `0..521` -> lookup list length `522`
-- `device` range `0..3031` -> lookup list length `3032`
-- `os` range `0..604` -> lookup list length `605`
-- `channel` range `0..498` -> lookup list length `499`
+## Data Source Comparison
 
-The dataset numeric code is used directly as the list index.
+| Aspect | Before (TalkingData) | After (WildChat) |
+|---|---|---|
+| Format | CSV with integer IDs | Arrow IPC stream with nested structs |
+| Rows | ~1.9M click records | 52M chat conversations (529k in train split) |
+| Prompt | Synthetic `"Show me a sponsored travel insurance"` | Real user messages from GPT chat |
+| Geo | Hardcoded 6-location list | Live GeoLite2 resolution (92% hit rate) |
+| Moderation data | None | `openai_moderation`, `detoxify_moderation`, `toxic`, `redacted` |
+| Session/publisher ID | Numeric index lookups | Real `conversation_id` (zero duplicates) |
 
-## Metadata Generation Ideas
+## Metadata Generation Strategy
 
-To keep the simulator useful for fraud work, generated events should eventually
-include combinations of:
+### IP and geo
 
-- request id and conversation id
-- session id
-- client IP hash
-- ASN
-- device type
-- publisher or placement metadata
-- prompt text
-- timestamps
+1. Generate a random public IPv4 (excluding private, loopback, multicast ranges).
+2. Resolve it through the GeoLite2-City MMDB.
+3. If resolution fails (8% of random IPs), retry up to 50 times.
+4. Fallback: `8.8.8.8` with country `US`.
+
+### User agents
+
+29 entries covering Chrome, Firefox, Safari, Edge on Windows / macOS / Linux /
+iOS / Android, plus bot and CLI agents (curl, wget, Googlebot, Bingbot,
+Postman).
+
+### Wrapping types
+
+Random pick from `["json", "txt", "xml"]` per event.
 
 ## Kafka Role
 
@@ -138,7 +155,6 @@ shallow consumer then applies Redis-based checks and forwards allowed events to
 
 Future implementation work on the simulator should prioritize:
 
-- realistic event schema generation
 - configurable fraud ratios
 - repeatable seeds for evaluation runs
 - attack-mode toggles
