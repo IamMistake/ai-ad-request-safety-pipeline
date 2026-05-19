@@ -1,19 +1,15 @@
-import csv
 import json
 import time
 
+import pyarrow as pa
+import pyarrow.ipc as ipc
 from kafka import KafkaProducer
 
-from simulator_constants import (
-    DATASET_PATH,
-    DEFAULT_RATE_PER_SEC,
-    KAFKA_BOOTSTRAP,
-    KAFKA_TOPIC,
-)
+from simulator_constants import DATASET_PATH, DEFAULT_RATE_PER_SEC, KAFKA_BOOTSTRAP, KAFKA_TOPIC
 from simulator_events import build_request_event, validate_row
 
 
-def simulate_request(row: dict[str, str], producer: KafkaProducer) -> bool:
+def simulate_request(row: dict, producer: KafkaProducer) -> bool:
     if not validate_row(row):
         return False
 
@@ -32,20 +28,26 @@ def run_simulator(rate_per_sec: float = DEFAULT_RATE_PER_SEC):
     failed = 0
     interval = 1.0 / rate_per_sec if rate_per_sec > 0 else 0.0
 
-    with DATASET_PATH.open("r", newline="") as csv_file:
-        reader = csv.DictReader(csv_file)
-        for row in reader:
-            ok = simulate_request(row, producer)
-            if ok:
-                sent += 1
-            else:
-                failed += 1
+    arrow_files = sorted(DATASET_PATH.glob("data-*.arrow"))
 
-            if interval > 0:
-                time.sleep(interval)
+    for arrow_file in arrow_files:
+        with pa.memory_map(str(arrow_file), "r") as source:
+            reader = ipc.open_stream(source)
+            for batch in reader:
+                pdf = batch.to_pandas()
+                for _, pandas_row in pdf.iterrows():
+                    row = pandas_row.to_dict()
+                    ok = simulate_request(row, producer)
+                    if ok:
+                        sent += 1
+                    else:
+                        failed += 1
 
-            if sent and sent % 1000 == 0:
-                print(f"sent={sent} failed={failed}")
+                    if interval > 0:
+                        time.sleep(interval)
+
+                    if sent and sent % 1000 == 0:
+                        print(f"sent={sent} failed={failed}")
 
     producer.flush()
     producer.close()
