@@ -11,8 +11,8 @@ prototype stage, and what is planned next.
 | --- | --- | --- |
 | Project architecture | Established | Core pipeline direction is documented and preserved |
 | Docker infrastructure | Implemented | Kafka, Zookeeper, Redis, Kafka UI, and Redis Commander are present |
-| Request simulator | Prototype implementation | Function structure exists; event generation and send logic are the next step |
-| Shallow fraud detector | Initial pipeline stage | Redis strategy, thresholds, and rule constants are defined |
+| Request simulator | Implemented as ingestion prototype | Streams TalkingData CSV rows to Kafka with deterministic temporary enrichment for missing fields |
+| Shallow fraud detector | Prototype implementation | Redis counters, temporary scoring, and allow/deny placeholder logic are implemented |
 | Debug consumer | Implemented for local inspection | Useful for observing local topic traffic |
 | Flink fraud processor | Implemented as current main runtime prototype | Consumes Kafka and emits real-time verdict output |
 | Spark analytics and training | Implemented as batch prototype | Reads historical logs, aggregates per-IP activity, and trains a model |
@@ -27,13 +27,15 @@ prototype stage, and what is planned next.
 | Flink streaming fraud prototype | `flink_service/fraud_detection.py` |
 | Spark analytics and training prototype | `spark_service/spark_training.py` |
 | Debug consumer | `test_consumer.py` |
+| Shallow Kafka consumer/forwarder | `shallow_fraud_detection/shallow_fraud_consumer.py` |
+| Placeholder fraud verdict consumer | `flink_service/fraud_verdict_consumer.py` |
 
 ## Partially Implemented Components
 
 | Component | File | Current state |
 | --- | --- | --- |
-| Request simulator | `kafka/producers/request_simulator.py` | Function structure and responsibilities are defined |
-| Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Redis-backed strategy is defined; methods are ready for implementation |
+| Request simulator | `kafka/producers/request_simulator.py` | Reads CSV row-by-row, builds request events, and publishes to Kafka |
+| Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Hashing, Redis TTL counters, and placeholder risk scoring are implemented |
 | Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established |
 
 ## Planned Components
@@ -63,14 +65,12 @@ prototype stage, and what is planned next.
 
 ## Current Development Priorities
 
-1. Complete simulator publishing.
-2. Implement shallow Redis checks.
-3. Align topic flow across services.
-4. Generate or capture historical training data.
+1. Implement shallow Redis checks.
+2. Align topic flow across services.
+3. Generate or capture historical training data.
 
 ## TODO Snapshot
 
-- Implement `simulate_request(...)` in `kafka/producers/request_simulator.py`.
 - Implement Redis hashing and counter updates in `shallow_fraud_detection/shallow_fraud_detector.py`.
 - Connect the shallow-detection output stage to the Kafka topic consumed by Flink.
 - Produce a first reusable historical dataset for `spark_service/spark_training.py`.

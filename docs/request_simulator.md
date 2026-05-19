@@ -19,7 +19,9 @@ The file defines two main functions:
 | `simulate_request(args)` | Validate request input, build event JSON, and publish to Kafka |
 | `run_simulator()` | Generate requests continuously and control emission rate |
 
-The current scaffold already indicates the expected simulator lifecycle.
+The simulator now implements this lifecycle by reading the TalkingData CSV,
+mapping dataset columns to the request schema, generating deterministic lookup
+values for missing properties, and publishing JSON events to Kafka.
 
 ## Why The Simulator Matters
 
@@ -63,24 +65,54 @@ Examples:
 
 ## Event Schema Direction
 
-The current Flink and Spark code imply a request structure similar to the
-following:
+The current simulator emits request events with the following shape:
 
 ```json
 {
-  "prompt": "Show me a sponsored option for cheap travel insurance",
-  "conversation": {
-    "message_id": "msg_001"
+  "event_time": "2017-11-10T04:00:00Z",
+  "req_id": "req_1",
+  "prompt": "Show me a sponsored travel insurance",
+  "request_context": {
+    "session_id": "sess_4e2f78a921_107",
+    "user_agent": "Mozilla/5.0 ...",
+    "user_ip": "5744"
   },
-  "metadata": {
-    "client": {
-      "ip_hash": "abc123",
-      "asn": 64512,
-      "device_type": "mobile"
-    }
+  "request_configuration": {
+    "wrapping_type": "xml"
+  },
+  "optional_context": {
+    "country": "RS",
+    "region": "Belgrade",
+    "city": "Belgrade",
+    "asn": 64512,
+    "age": 29,
+    "gender": "female"
+  },
+  "publisher_info": {
+    "publisher_id": "pub_107",
+    "publisher_url": "https://publisher-107.example.com"
+  },
+  "source_dataset": {
+    "app": 9,
+    "device": 1,
+    "os": 3,
+    "channel": 107
   }
 }
 ```
+
+## Deterministic Temporary Lookup Strategy
+
+Because the source CSV does not include all required request properties, the
+simulator uses deterministic lookup lists generated once at startup with a fixed
+seed.
+
+- `app` range `0..521` -> lookup list length `522`
+- `device` range `0..3031` -> lookup list length `3032`
+- `os` range `0..604` -> lookup list length `605`
+- `channel` range `0..498` -> lookup list length `499`
+
+The dataset numeric code is used directly as the list index.
 
 ## Metadata Generation Ideas
 
@@ -98,9 +130,9 @@ include combinations of:
 
 ## Kafka Role
 
-The current simulator scaffold references topic `shallow-fraud-detection`.
-Within the preserved architecture, the simulator should remain the traffic source
-that feeds the shallow fraud layer and then the broader Kafka pipeline.
+The current simulator publishes to `shallow-fraud-detection` as ingress. A
+shallow consumer then applies Redis-based checks and forwards allowed events to
+`ad.request_raw` for Flink consumption.
 
 ## Engineering Guidance
 
