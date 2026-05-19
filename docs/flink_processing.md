@@ -17,7 +17,7 @@ rules that are suitable for low-latency analysis.
 ```mermaid
 flowchart LR
     A[KafkaSource ad.request_raw] --> B[Parse JSON]
-    B --> C[Extract request_id, ip_hash, prompt]
+    B --> C[Extract req_id, user_ip, prompt]
     C --> D[Apply keyword and IP-frequency rules]
     D --> E[Produce verdict payload]
     E --> F[Print sink]
@@ -28,7 +28,7 @@ flowchart LR
 | Rule | Description | Current source |
 | --- | --- | --- |
 | Scam prompt keywords | Flag requests containing known suspicious phrases | `SCAM_KEYWORDS` |
-| IP request frequency | Flag repeated requests from the same IP hash | `ip_counter` |
+| IP request frequency | Flag repeated requests from the same IP | `ip_counter` |
 
 ## Current Implementation Notes
 
@@ -39,7 +39,7 @@ The current file performs the following steps:
 3. Configures a Kafka source for `ad.request_raw`.
 4. Reads string events with `SimpleStringSchema`.
 5. Parses JSON with `analyze_request`.
-6. Extracts `metadata.client.ip_hash`, `prompt`, and `conversation.message_id`.
+6. Extracts `request_context.user_ip`, `prompt`, and `req_id`.
 7. Applies rule-based fraud logic.
 8. Prints result events.
 

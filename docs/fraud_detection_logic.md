@@ -65,12 +65,12 @@ Current design signals in `shallow_fraud_detection/shallow_fraud_detector.py`:
 The current real-time prototype in `flink_service/fraud_detection.py` uses:
 
 - prompt keyword inspection
-- repeated request counts by `ip_hash`
+- repeated request counts by `request_context.user_ip`
 
 Current prototype verdict logic:
 
 - mark as `fraud` when prompt contains scam terms
-- mark as `fraud` when one IP hash exceeds 15 requests in the running counter
+- mark as `fraud` when one IP exceeds 15 requests in the running counter
 
 ## Historical Logic In Spark
 

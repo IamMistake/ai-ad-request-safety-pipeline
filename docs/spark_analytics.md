@@ -26,7 +26,7 @@ patterns, and retrain models. Spark fills that role in the current design.
 flowchart LR
     A[Historical request_logs.json] --> B[Load with Spark]
     B --> C[Feature engineering]
-    C --> D[Aggregate per-IP statistics]
+    C --> D[Aggregate per-IP request statistics]
     C --> E[Convert selected features to Pandas]
     E --> F[Train RandomForestClassifier]
     D --> G[Write IP risk scores]
@@ -42,7 +42,7 @@ The batch job currently:
 3. Lowercases prompt text.
 4. Extracts scam-keyword matches with a regex.
 5. Builds a label from `fraud_verdict == "fraud"`.
-6. Aggregates request counts by `metadata.client.ip_hash`.
+6. Aggregates request counts by `request_context.user_ip`.
 7. Writes per-IP aggregate output.
 8. Converts selected features to Pandas.
 9. Trains a `RandomForestClassifier`.
@@ -53,8 +53,8 @@ The batch job currently:
 | Feature | Meaning |
 | --- | --- |
 | `contains_scam` | Whether prompt text matches known suspicious phrases |
-| `asn` | Autonomous System Number as a network-level signal |
-| `device_type` | Available in extracted data, useful for future modeling |
+| `asn` | Autonomous System Number as a network-level signal (from `optional_context.asn`) |
+| `publisher_id` | Traffic source identifier, useful for future modeling |
 | `label` | Fraud label derived from historical verdicts |
 
 ## Current Role In The Larger System

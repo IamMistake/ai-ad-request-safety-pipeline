@@ -11,7 +11,7 @@ prototype stage, and what is planned next.
 | --- | --- | --- |
 | Project architecture | Established | Core pipeline direction is documented and preserved |
 | Docker infrastructure | Implemented | Kafka, Zookeeper, Redis, Kafka UI, and Redis Commander are present |
-| Request simulator | Implemented as ingestion prototype | Streams TalkingData CSV rows to Kafka with deterministic temporary enrichment for missing fields |
+| Request simulator | Implemented as ingestion prototype | Streams WildChat Arrow rows to Kafka with GeoLite2-enriched geo context, random IPs, and real prompt text |
 | Shallow fraud detector | Prototype implementation | Redis counters, temporary scoring, and allow/deny placeholder logic are implemented |
 | Debug consumer | Implemented for local inspection | Useful for observing local topic traffic |
 | Flink fraud processor | Implemented as current main runtime prototype | Consumes Kafka and emits real-time verdict output |
@@ -34,7 +34,10 @@ prototype stage, and what is planned next.
 
 | Component | File | Current state |
 | --- | --- | --- |
-| Request simulator | `kafka/producers/request_simulator.py` | Reads CSV row-by-row, builds request events, and publishes to Kafka |
+| Request simulator | `kafka/producers/request_simulator.py` | Reads WildChat Arrow shards, builds request events with real prompts, random IPs from GeoLite2, synthetic enrichment (UA, wrapping, optional_context), and publishes to Kafka |
+| Simulator constants | `kafka/producers/simulator_constants.py` | Dataset path, GeoLite2 path, expanded UA list, wrapping types, required source fields for WildChat |
+| Simulator event builder | `kafka/producers/simulator_events.py` | Validates WildChat rows (conversation_id, conversation, timestamp), extracts first user turn as prompt, builds event JSON |
+| Simulator lookups | `kafka/producers/simulator_lookups.py` | Random public IP generation with GeoLite2 resolution, UA/wrapping pickers, optional_context builder |
 | Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Hashing, Redis TTL counters, and placeholder risk scoring are implemented |
 | Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established |
 

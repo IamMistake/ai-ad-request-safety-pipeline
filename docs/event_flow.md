@@ -68,7 +68,7 @@ The current codebase represents an initial version of the lifecycle above:
 
 | Stage | Current status |
 | --- | --- |
-| Simulator | Prototype scaffold exists |
+| Simulator | Streams WildChat Arrow rows with GeoLite2-enriched geo context |
 | Shallow fraud layer | Redis-backed detector scaffold exists |
 | Kafka transport | Local infrastructure is present in Docker Compose |
 | Flink processor | Current real-time logic is implemented as a prototype |
@@ -88,15 +88,22 @@ architectural change request.
 
 ## Event Schema Direction
 
-The current code suggests a request structure with fields such as:
+The current code produces a request structure with these top-level fields:
 
-- `prompt`
-- `conversation.message_id`
-- `metadata.client.ip_hash`
-- `metadata.client.asn`
-- `metadata.client.device_type`
+- `req_id` — random request identity
+- `prompt` — user prompt text from WildChat
+- `language` — conversation language
+- `request_context.session_id` — session identity
+- `request_context.user_ip` — client IP
+- `request_context.user_agent` — client user-agent
+- `request_configuration.wrapping_type` — wrapping format (`json`/`txt`/`xml`)
+- `optional_context.country` — geo country
+- `optional_context.region` — geo region
+- `optional_context.city` — geo city
+- `optional_context.asn` — network-level signal
+- `publisher_id` — traffic source identity
 
-These fields form the initial schema contract between ingestion, stream
+These fields form the current schema contract between ingestion, stream
 processing, and analytics.
 
 ## Future Event Flow Extensions
