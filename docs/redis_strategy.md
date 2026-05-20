@@ -33,20 +33,21 @@ The shallow detector is designed to use Redis for:
 
 ## Current Rule Windows In Code
 
-`ShallowFraudDetector` already defines these windows and thresholds:
+`ShallowFraudDetector` currently uses Redis for these short-lived checks:
 
-| Signal | Window | Threshold |
+| Signal | Window | Rule |
 | --- | --- | --- |
-| IP frequency | 10 seconds | 20 |
-| User-agent frequency | 30 seconds | 50 |
-| Session frequency | 60 seconds | 40 |
+| IP last seen | 60 seconds | flag `ip_burst` when the same IP repeats within 3s for phone/tablet UAs or 2s for desktop/other UAs |
+| Session frequency | 60 seconds | flag `session_burst` when one session exceeds 40 requests |
 
 ## Current Penalties In Code
 
 | Penalty | Value |
 | --- | --- |
-| VPN penalty | `0.3` |
-| Scam penalty | `0.5` |
+| Suspicious user-agent heuristic | `0.1` |
+| Negative keyword prompt match | `0.4` |
+| Invalid user-agent | `0.2` |
+| Language-country mismatch | `0.2` |
 
 ## Suggested Redis Key Patterns
 
@@ -54,8 +55,7 @@ These key families align with the current architecture and detector design:
 
 | Key pattern | Purpose |
 | --- | --- |
-| `fraud:ip:{ip_hash}` | Count requests from one IP within a TTL window |
-| `fraud:ua:{ua_hash}` | Count repeated user-agent activity |
+| `fraud:last_seen:ip:{ip_hash}` | Track the last time one IP was seen for rapid-repeat checks |
 | `fraud:session:{session_id}` | Count requests within one session |
 | `fraud:score:{request_id}` | Cache early fraud score for downstream use |
 | `fraud:last_seen:{identity}` | Track recent activity timestamps |
@@ -65,9 +65,9 @@ These key families align with the current architecture and detector design:
 Redis is especially useful because the project relies on short observation
 windows. A simple pattern is:
 
-1. increment the key
+1. increment the key or update a last-seen timestamp
 2. set or preserve TTL
-3. interpret the resulting count as a burst signal
+3. interpret the resulting state as a shallow fraud signal
 
 This fits the current shallow fraud layer design directly.
 
