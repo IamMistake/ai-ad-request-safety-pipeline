@@ -1,18 +1,25 @@
 import json
+import sys
+from pathlib import Path
 
 from kafka import KafkaConsumer, KafkaProducer
 
-from shallow_fraud_detector import ShallowFraudDetector
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
 
-KAFKA_BOOTSTRAP = "localhost:9092"
-INPUT_TOPIC = "shallow-fraud-detection"
-OUTPUT_TOPIC = "ad.request_raw"
+from pipeline_consumers.constants import AD_INJECTION_TOPIC, KAFKA_API_VERSION, KAFKA_BOOTSTRAP, SHALLOW_FRAUD_TOPIC
+from shallow_fraud_detection.shallow_fraud_detector import ShallowFraudDetector
+
+INPUT_TOPIC = SHALLOW_FRAUD_TOPIC
+OUTPUT_TOPIC = AD_INJECTION_TOPIC
 
 
 def main():
     consumer = KafkaConsumer(
         INPUT_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
+        api_version=KAFKA_API_VERSION,
         auto_offset_reset="earliest",
         enable_auto_commit=True,
         group_id="shallow-fraud-consumer",
@@ -21,6 +28,7 @@ def main():
 
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP,
+        api_version=KAFKA_API_VERSION,
         value_serializer=lambda value: json.dumps(value).encode("utf-8"),
     )
 
@@ -37,6 +45,7 @@ def main():
                 "shallow_fraud": result,
             }
             producer.send(OUTPUT_TOPIC, forwarded)
+            print(f"FORWARD req_id={result.get('req_id')} -> {OUTPUT_TOPIC}")
         else:
             print(f"DENY req_id={result.get('req_id')} flags={result.get('flags')}")
 

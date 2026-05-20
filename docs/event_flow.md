@@ -52,10 +52,12 @@ Typical signals at this layer:
 Requests that pass the shallow layer are published to Kafka. Kafka provides the
 stream backbone for downstream processors.
 
-### 4. Flink real-time fraud processing
+### 4. Parallel downstream processing
 
-Flink consumes Kafka events and evaluates streaming fraud rules. The current
-prototype performs request parsing, prompt inspection, and IP-frequency checks.
+Allowed requests are currently fanned out through a shared Kafka topic so
+multiple downstream consumers can process the same request concurrently. A
+separate cancel topic allows one downstream worker to interrupt the others while
+they are still processing.
 
 ### 5. Historical analytics and training
 
@@ -71,7 +73,8 @@ The current codebase represents an initial version of the lifecycle above:
 | Simulator | Streams WildChat Arrow rows with GeoLite2-enriched geo context |
 | Shallow fraud layer | Redis-backed detector scaffold exists |
 | Kafka transport | Local infrastructure is present in Docker Compose |
-| Flink processor | Current real-time logic is implemented as a prototype |
+| Parallel downstream consumers | Ad injection, placeholder fraud, and placeholder moderation workers run in parallel on the same topic |
+| Flink processor | Separate real-time logic is still implemented as a prototype |
 | Spark analytics | Current offline training logic is implemented as a prototype |
 
 ## Current Event Boundaries
@@ -81,6 +84,8 @@ The repository currently references more than one topic naming path.
 | Topic | Context |
 | --- | --- |
 | `shallow-fraud-detection` | Referenced by simulator scaffold and debug consumer |
+| `ad.injection` | Current shallow-approved fan-out topic for three downstream consumers |
+| `ad.cancel` | Current downstream interrupt topic for in-flight work |
 | `ad.request_raw` | Used by the Flink streaming job |
 
 This should be read as an implementation alignment task rather than an
@@ -102,6 +107,13 @@ The current code produces a request structure with these top-level fields:
 - `optional_context.city` — geo city
 - `optional_context.asn` — network-level signal
 - `publisher_id` — traffic source identity
+
+The current downstream placeholder consumers also recognize an optional
+`control` block for local testing:
+
+- `control.cancel_by` — one of `ad-injection`, `fraud-detection`, or `moderation-detection`
+- `control.cancel_at_percent` — percent progress at which that consumer emits `ad.cancel`
+- `control.cancel_reason` — free-text reason included in the cancel message
 
 These fields form the current schema contract between ingestion, stream
 processing, and analytics.

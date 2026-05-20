@@ -11,17 +11,18 @@ partitions and consumer groups.
 | Topic | Purpose | Current reference | Status |
 | --- | --- | --- | --- |
 | `shallow-fraud-detection` | Prototype ingress topic for simulator output | `kafka/producers/request_simulator.py`, `test_consumer.py` | Initial pipeline stage |
+| `ad.injection` | Shared downstream request topic for ad injection, fraud, and moderation consumers | `shallow_fraud_detection/shallow_fraud_consumer.py`, `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/fraud_detection_consumer.py`, `pipeline_consumers/moderation_consumer.py` | Active in prototype |
+| `ad.cancel` | Cross-consumer cancellation signal for in-flight downstream work | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/fraud_detection_consumer.py`, `pipeline_consumers/moderation_consumer.py` | Active in prototype |
 | `ad.request_raw` | Raw request stream consumed by Flink | `flink_service/fraud_detection.py` | Active in prototype |
 | `fraud.verdicts` | Fraud decisions emitted after stream analysis | `README.md` | Planned topic |
 | `moderation.verdicts` | Prompt moderation decisions | `README.md` | Planned topic |
 | `ad.candidate` | Approved ad candidate flow | `README.md` | Planned topic |
-| `ad.cancel` | Cancelled or rejected ad requests | `README.md` | Planned topic |
 
 ## Suggested Reading Of Current State
 
-The repository currently shows both an initial ingress topic and a downstream
-raw-request topic. This indicates the system is in the process of connecting the
-shallow detection stage to the richer stream-processing stage.
+The repository currently shows both a shared downstream fan-out topic and an
+older raw-request topic. This indicates the system is in the middle of topic
+alignment work rather than a settled final contract.
 
 ## Event Contract Direction
 
@@ -43,6 +44,9 @@ Consumer groups are a key streaming concept for this project.
 
 | Consumer group idea | Purpose |
 | --- | --- |
+| `ad-injection-consumer` | Placeholder ad injection worker that receives all fan-out events |
+| `fraud-detection-consumer` | Placeholder fraud worker that receives all fan-out events |
+| `moderation-detection-consumer` | Placeholder moderation worker that receives all fan-out events |
 | `flink-consumer` | Current Flink group for raw request analysis |
 | fraud-processing groups | Scale real-time fraud processors horizontally |
 | moderation groups | Scale planned moderation processors independently |
@@ -69,17 +73,21 @@ consumers without changing the architectural foundation.
 flowchart LR
     A[Simulator Output] --> B[shallow-fraud-detection]
     B --> C[Shallow Decision / Forwarding]
-    C --> D[ad.request_raw]
-    D --> E[Flink Fraud Processing]
-    E --> F[fraud.verdicts]
-    D --> G[Planned Moderation Service]
-    G --> H[moderation.verdicts]
+    C --> D[ad.injection]
+    D --> E[Ad Injection Consumer]
+    D --> F[Fraud Detection Consumer Placeholder]
+    D --> G[Moderation Detection Consumer Placeholder]
+    E --> H[ad.cancel]
+    F --> H
+    G --> H
 ```
 
 ## Implementation Notes
 
-- The Flink job currently consumes `ad.request_raw`.
-- The debug consumer currently listens to `shallow-fraud-detection`.
+- The shallow consumer currently forwards allowed events to `ad.injection`.
+- The ad injection, placeholder fraud, and placeholder moderation consumers each use a distinct consumer group so they all receive the same request in parallel.
+- Each downstream consumer also listens to `ad.cancel` and can stop in-flight work when another consumer emits a matching cancel message.
+- The separate Flink prototype job still consumes `ad.request_raw`.
 - Topic standardization should be handled as a continuation of the current
   architecture, not as a redesign.
 

@@ -1,12 +1,21 @@
-from kafka import KafkaConsumer
 import json
 
-KAFKA_BOOTSTRAP = "localhost:9092"
+from kafka import KafkaConsumer
+
+from pipeline_consumers.constants import (
+    AD_CANCEL_TOPIC,
+    AD_INJECTION_TOPIC,
+    FRAUD_VERDICTS_TOPIC,
+    KAFKA_API_VERSION,
+    KAFKA_BOOTSTRAP,
+    SHALLOW_FRAUD_TOPIC,
+)
 
 TOPICS = [
-    "shallow-fraud-detection",
-    "ad.request_raw",
-    "fraud.verdicts",
+    SHALLOW_FRAUD_TOPIC,
+    AD_INJECTION_TOPIC,
+    AD_CANCEL_TOPIC,
+    FRAUD_VERDICTS_TOPIC,
 ]
 
 def main():
@@ -19,6 +28,7 @@ def main():
     consumer = KafkaConsumer(
         *TOPICS,
         bootstrap_servers=KAFKA_BOOTSTRAP,
+        api_version=KAFKA_API_VERSION,
         auto_offset_reset="earliest",
         enable_auto_commit=True,
         value_deserializer=lambda v: json.loads(v.decode("utf-8"))
@@ -31,11 +41,13 @@ def main():
         print(f"🧩 Message: {json.dumps(msg.value, indent=2)[:800]}")
         print("------------------------------------------\n")
 
-        if msg.topic == "shallow-fraud-detection":
+        if msg.topic == SHALLOW_FRAUD_TOPIC:
             print("placeholder: received ingress request")
-        elif msg.topic == "ad.request_raw":
-            print("placeholder: received shallow-approved request")
-        elif msg.topic == "fraud.verdicts":
+        elif msg.topic == AD_INJECTION_TOPIC:
+            print("placeholder: received fan-out request for downstream consumers")
+        elif msg.topic == AD_CANCEL_TOPIC:
+            print("placeholder: received cancel signal for downstream consumers")
+        elif msg.topic == FRAUD_VERDICTS_TOPIC:
             print("placeholder: received fraud verdict event")
 
 

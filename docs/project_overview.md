@@ -69,6 +69,7 @@ flowchart LR
 | `docker-compose.yml` | Local Kafka and Redis infrastructure |
 | `kafka/producers/request_simulator.py` | Prototype request generator |
 | `shallow_fraud_detection/shallow_fraud_detector.py` | Redis-backed shallow fraud layer scaffold |
+| `pipeline_consumers/` | Placeholder downstream consumers and shared Kafka fan-out utilities |
 | `test_consumer.py` | Debug consumer for local message inspection |
 | `flink_service/fraud_detection.py` | Current real-time fraud detection prototype |
 | `spark_service/spark_training.py` | Current offline analytics and model training prototype |

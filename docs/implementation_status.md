@@ -27,8 +27,12 @@ prototype stage, and what is planned next.
 | Flink streaming fraud prototype | `flink_service/fraud_detection.py` |
 | Spark analytics and training prototype | `spark_service/spark_training.py` |
 | Debug consumer | `test_consumer.py` |
+| Full pipeline test script | `scripts/test_full_pipeline.sh` |
+| Cancel flow test script | `scripts/test_cancel_flow.sh` |
 | Shallow Kafka consumer/forwarder | `shallow_fraud_detection/shallow_fraud_consumer.py` |
-| Placeholder fraud verdict consumer | `flink_service/fraud_verdict_consumer.py` |
+| Ad injection placeholder consumer | `pipeline_consumers/ad_injection_consumer.py` |
+| Placeholder fraud detection consumer | `pipeline_consumers/fraud_detection_consumer.py` |
+| Placeholder moderation detection consumer | `pipeline_consumers/moderation_consumer.py` |
 
 ## Partially Implemented Components
 
@@ -38,7 +42,9 @@ prototype stage, and what is planned next.
 | Simulator constants | `kafka/producers/simulator_constants.py` | Dataset path, GeoLite2 path, expanded UA list, wrapping types, required source fields for WildChat |
 | Simulator event builder | `kafka/producers/simulator_events.py` | Validates WildChat rows (conversation_id, conversation, timestamp), extracts first user turn as prompt, builds event JSON |
 | Simulator lookups | `kafka/producers/simulator_lookups.py` | Random public IP generation with GeoLite2 resolution, UA/wrapping pickers, optional_context builder |
-| Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Hashing, Redis TTL state, UA heuristics, negative keyword matching, language-country checks, and shallow scoring are implemented |
+| Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Hashing, Redis TTL state, UA heuristics, negative keyword matching, language-country checks, shallow scoring, and nested original-request return payloads are implemented |
+| Downstream fan-out placeholders | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/fraud_detection_consumer.py`, `pipeline_consumers/moderation_consumer.py` | Three independent consumers subscribe to `ad.injection`, process in parallel with distinct consumer groups, and can interrupt each other via `ad.cancel` |
+| Scripted pipeline tests | `scripts/test_full_pipeline.sh`, `scripts/test_cancel_flow.sh` | Bring up infra, start the four consumers, publish a representative event, validate expected log output, and clean up spawned processes |
 | Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established |
 
 ## Planned Components
@@ -69,13 +75,13 @@ prototype stage, and what is planned next.
 ## Current Development Priorities
 
 1. Align downstream consumers with the updated shallow event schema.
-2. Align topic flow across services.
+2. Replace placeholder downstream consumers with real fraud, moderation, and ad-injection services.
 3. Generate or capture historical training data.
 
 ## TODO Snapshot
 
 - Tune shallow fraud thresholds against representative simulator traffic.
-- Connect the shallow-detection output stage to the Kafka topic consumed by Flink.
+- Decide how the future Flink fraud job should consume or derive from `ad.injection`.
 - Produce a first reusable historical dataset for `spark_service/spark_training.py`.
 
 ## Maintenance Rule
