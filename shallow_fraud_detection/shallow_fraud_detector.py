@@ -4,27 +4,50 @@ from typing import Any, Dict
 
 import redis
 
-from constants import (
-    ALLOW_SCORE_THRESHOLD,
-    DESKTOP_IP_REPEAT_SECONDS,
-    INVALID_UA_PENALTY,
-    IP_BURST_PENALTY,
-    LANGUAGE_ALIASES,
-    LANGUAGE_COUNTRIES,
-    LANGUAGE_MISMATCH_PENALTY,
-    LAST_SEEN_WINDOW,
-    MAX_FRAUD_SCORE,
-    MAX_SESSION_FREQ,
-    MOBILE_IP_REPEAT_SECONDS,
-    NEGATIVE_KEYWORD_PENALTY,
-    NEGATIVE_KEYWORD_PATTERN,
-    SCORE_DECIMAL_PLACES,
-    SESSION_WINDOW,
-    SESSION_BURST_PENALTY,
-    SUSPICIOUS_UA_MARKERS,
-    SUSPICIOUS_UA_PENALTY,
-    VALID_UA_MARKERS,
-)
+try:
+    from .constants import (
+        ALLOW_SCORE_THRESHOLD,
+        DESKTOP_IP_REPEAT_SECONDS,
+        INVALID_UA_PENALTY,
+        IP_BURST_PENALTY,
+        LANGUAGE_ALIASES,
+        LANGUAGE_COUNTRIES,
+        LANGUAGE_MISMATCH_PENALTY,
+        LAST_SEEN_WINDOW,
+        MAX_FRAUD_SCORE,
+        MAX_SESSION_FREQ,
+        MOBILE_IP_REPEAT_SECONDS,
+        NEGATIVE_KEYWORD_PENALTY,
+        NEGATIVE_KEYWORD_PATTERN,
+        SCORE_DECIMAL_PLACES,
+        SESSION_WINDOW,
+        SESSION_BURST_PENALTY,
+        SUSPICIOUS_UA_MARKERS,
+        SUSPICIOUS_UA_PENALTY,
+        VALID_UA_MARKERS,
+    )
+except ImportError:
+    from constants import (
+        ALLOW_SCORE_THRESHOLD,
+        DESKTOP_IP_REPEAT_SECONDS,
+        INVALID_UA_PENALTY,
+        IP_BURST_PENALTY,
+        LANGUAGE_ALIASES,
+        LANGUAGE_COUNTRIES,
+        LANGUAGE_MISMATCH_PENALTY,
+        LAST_SEEN_WINDOW,
+        MAX_FRAUD_SCORE,
+        MAX_SESSION_FREQ,
+        MOBILE_IP_REPEAT_SECONDS,
+        NEGATIVE_KEYWORD_PENALTY,
+        NEGATIVE_KEYWORD_PATTERN,
+        SCORE_DECIMAL_PLACES,
+        SESSION_WINDOW,
+        SESSION_BURST_PENALTY,
+        SUSPICIOUS_UA_MARKERS,
+        SUSPICIOUS_UA_PENALTY,
+        VALID_UA_MARKERS,
+    )
 
 r = redis.Redis(host="localhost", port=6379, db=0)
 
@@ -172,6 +195,7 @@ class ShallowFraudDetector:
             "flags": flags,
             "allow": allow,
             "verdict": verdict,
+            "request": request,
             "counts": {
                 "session_count": session_count,
             },

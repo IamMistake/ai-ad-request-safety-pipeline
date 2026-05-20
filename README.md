@@ -51,13 +51,24 @@ python kafka/producers/request_simulator.py
 python test_consumer.py
 ```
 
+5) Run the scripted pipeline tests
+
+```bash
+./scripts/test_full_pipeline.sh
+```
+
+```bash
+./scripts/test_cancel_flow.sh
+```
+
 ## Kafka topics
 
 - `ad.request_raw`
+- `ad.injection`
+- `ad.cancel`
 - `fraud.verdicts`
 - `moderation.verdicts`
 - `ad.candidate`
-- `ad.cancel`
 
 ## Notes
 

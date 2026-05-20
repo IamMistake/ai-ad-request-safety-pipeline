@@ -49,6 +49,10 @@ Current design signals in `shallow_fraud_detection/shallow_fraud_detector.py`:
 - negative keyword prompt matching
 - language-country mismatch checks
 
+The current detector result also includes the original request nested alongside
+the shallow fraud metadata so downstream consumers can reuse the source event
+without reconstructing it.
+
 ### Current Shallow Constants
 
 | Constant | Meaning |
