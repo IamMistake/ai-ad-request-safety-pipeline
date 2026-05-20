@@ -43,22 +43,20 @@ The shallow detector is intended for very fast early decisions.
 
 Current design signals in `shallow_fraud_detection/shallow_fraud_detector.py`:
 
-- IP request frequency window
-- user-agent request frequency window
+- rapid repeat requests from the same IP with UA-specific timing thresholds
 - session request frequency window
-- scam keyword penalties
-- VPN-related penalty scoring
+- suspicious or malformed user-agent heuristics
+- negative keyword prompt matching
+- language-country mismatch checks
 
 ### Current Shallow Constants
 
 | Constant | Meaning |
 | --- | --- |
-| `IP_WINDOW = 10` | Short burst window for one IP |
-| `UA_WINDOW = 30` | User-agent observation window |
 | `SESSION_WINDOW = 60` | Session observation window |
-| `MAX_IP_FREQ = 20` | IP threshold |
-| `MAX_UA_FREQ = 50` | User-agent threshold |
 | `MAX_SESSION_FREQ = 40` | Session threshold |
+| `MOBILE_IP_REPEAT_SECONDS = 3.0` | Mobile/tablet same-IP rapid repeat threshold |
+| `DESKTOP_IP_REPEAT_SECONDS = 2.0` | Desktop/other same-IP rapid repeat threshold |
 
 ## Flink Stream-Time Logic
 
@@ -103,10 +101,11 @@ Example scoring direction:
 
 | Signal | Example contribution |
 | --- | --- |
-| IP threshold exceeded | high risk contribution |
-| Scam prompt match | high risk contribution |
-| VPN indicator | moderate risk contribution |
+| Same-IP request arrives too quickly | high risk contribution |
+| Negative prompt match | moderate risk contribution |
 | Reused session burst | moderate risk contribution |
+| Invalid or suspicious user-agent | low to moderate contribution |
+| Language-country mismatch | moderate contribution |
 | Historical risk score from Spark | context-dependent contribution |
 
 ## Planned Detection Extensions

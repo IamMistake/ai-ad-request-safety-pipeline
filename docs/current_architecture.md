@@ -94,7 +94,7 @@ extending the existing layers instead of replacing them.
 
 | Area | Current prototype note |
 | --- | --- |
-| Shallow fraud layer | Scaffolded with Redis strategy constants and method placeholders |
+| Shallow fraud layer | Prototype detector and Kafka forwarder exist with Redis-backed shallow rules |
 | Kafka usage | Present in documentation and local tooling; topic contracts are still being aligned |
 | Flink processing | Most advanced runtime component in the repository |
 | Spark training | Initial offline training pipeline is present |
