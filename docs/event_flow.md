@@ -18,9 +18,9 @@ sequenceDiagram
     Sim->>Redis: Build request and run shallow checks
     Redis-->>Sim: Allow or deny decision with early fraud signals
     Sim->>Kafka: Publish allowed request event
-    Kafka->>Flink: Stream request event
+    Kafka->>Flink: Stream shallow-approved event from ad.injection
     Flink->>Flink: Apply real-time fraud rules
-    Flink-->>Kafka: Planned fraud verdict publishing
+    Flink-->>Kafka: Publish fraud.verdicts and optional ad.cancel
     Kafka->>Spark: Planned historical export / batch input
     Spark->>Spark: Aggregate history and train models
 ```
@@ -73,8 +73,8 @@ The current codebase represents an initial version of the lifecycle above:
 | Simulator | Streams WildChat Arrow rows with GeoLite2-enriched geo context |
 | Shallow fraud layer | Redis-backed detector scaffold exists |
 | Kafka transport | Local infrastructure is present in Docker Compose |
-| Parallel downstream consumers | Ad injection, placeholder fraud, and placeholder moderation workers run in parallel on the same topic |
-| Flink processor | Separate real-time logic is still implemented as a prototype |
+| Parallel downstream consumers | Ad injection and placeholder moderation workers run in parallel on the same topic while Flink also consumes the same approved events |
+| Flink processor | Real keyed fraud logic consumes `ad.injection`, emits `fraud.verdicts`, and can send `ad.cancel` |
 | Spark analytics | Current offline training logic is implemented as a prototype |
 
 ## Current Event Boundaries
@@ -84,9 +84,9 @@ The repository currently references more than one topic naming path.
 | Topic | Context |
 | --- | --- |
 | `shallow-fraud-detection` | Referenced by simulator scaffold and debug consumer |
-| `ad.injection` | Current shallow-approved fan-out topic for three downstream consumers |
-| `ad.cancel` | Current downstream interrupt topic for in-flight work |
-| `ad.request_raw` | Used by the Flink streaming job |
+| `ad.injection` | Current shallow-approved fan-out topic for downstream consumers and the Flink fraud job |
+| `ad.cancel` | Downstream interrupt topic used by placeholder workers and by the Flink fraud job to suppress future requests for cancelled `req_id`s |
+| `ad.request_raw` | Legacy topic still referenced by older docs and README sections |
 
 This should be read as an implementation alignment task rather than an
 architectural change request.
@@ -114,6 +114,13 @@ The current downstream placeholder consumers also recognize an optional
 - `control.cancel_by` — one of `ad-injection`, `fraud-detection`, or `moderation-detection`
 - `control.cancel_at_percent` — percent progress at which that consumer emits `ad.cancel`
 - `control.cancel_reason` — free-text reason included in the cancel message
+
+The shallow forwarder also adds a `shallow_fraud` block that includes:
+
+- `shallow_fraud.fraud_score`
+- `shallow_fraud.flags`
+- `shallow_fraud.identities.ip_hash`
+- `shallow_fraud.identities.ua_hash`
 
 These fields form the current schema contract between ingestion, stream
 processing, and analytics.

@@ -149,7 +149,7 @@ Random pick from `["json", "txt", "xml"]` per event.
 
 The current simulator publishes to `shallow-fraud-detection` as ingress. A
 shallow consumer then applies Redis-based checks and forwards allowed events to
-`ad.request_raw` for Flink consumption.
+`ad.injection` for downstream consumers and Flink fraud consumption.
 
 ## Engineering Guidance
 
