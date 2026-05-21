@@ -85,6 +85,8 @@ flowchart LR
 | `docs/spark_analytics.md` | Offline analytics and historical processing |
 | `docs/redis_strategy.md` | Counter, cache, and shallow-detection strategy |
 | `docs/fraud_detection_logic.md` | Rule logic, scoring, and fraud categories |
+| `docs/event_schemas.md` | Current JSON payloads across the request and shallow-fraud pipeline |
+| `docs/shallow_fraud_checks.md` | Exact shallow detector checks and thresholds |
 | `docs/ml_pipeline.md` | Training pipeline and future model evolution |
 | `docs/request_simulator.md` | Synthetic traffic generation strategy |
 | `docs/moderation_service.md` | Planned moderation service |
