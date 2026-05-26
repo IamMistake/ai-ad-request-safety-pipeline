@@ -60,6 +60,7 @@ GENDERS = ["female", "male"]
 
 REQUIRED_SOURCE_FIELDS = [
     "conversation_id",
-    "conversation",
     "timestamp",
+    "prompt",
+    "publisher_id",
 ]
