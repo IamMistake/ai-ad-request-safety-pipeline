@@ -5,9 +5,9 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from pyflink.common import Types
+from pyflink.common import Duration, Types
 from pyflink.common.serialization import SimpleStringSchema
-from pyflink.common.watermark_strategy import WatermarkStrategy
+from pyflink.common.watermark_strategy import TimestampAssigner, WatermarkStrategy
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import (
     KafkaOffsetsInitializer,
@@ -23,17 +23,28 @@ from flink_service.constants import (
     FRAUD_JOB_NAME,
     FRAUD_VERDICTS_TOPIC,
     KAFKA_BOOTSTRAP,
+    REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
 )
 from flink_service.detector import FraudDetector
 from flink_service.events import (
     CANCEL_STREAM_KIND,
     REQUEST_STREAM_KIND,
     extract_identity_key,
+    extract_event_timestamp_ms,
     extract_request_key,
+    load_event,
     should_emit_cancel,
     verdict_to_cancel,
     wrap_stream_event,
 )
+
+
+class RequestTimestampAssigner(TimestampAssigner):
+    def extract_timestamp(self, value: str, record_timestamp: int) -> int:
+        event_timestamp_ms = extract_event_timestamp_ms(load_event(value))
+        if event_timestamp_ms is None:
+            return 0
+        return event_timestamp_ms
 
 
 def build_kafka_sink(topic: str) -> KafkaSink:
@@ -95,7 +106,13 @@ def main() -> None:
         output_type=Types.STRING(),
     )
 
-    analyzed = active_requests.key_by(extract_identity_key).process(
+    watermarked_requests = active_requests.assign_timestamps_and_watermarks(
+        WatermarkStrategy.for_bounded_out_of_orderness(
+            Duration.of_seconds(REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS)
+        ).with_timestamp_assigner(RequestTimestampAssigner())
+    )
+
+    analyzed = watermarked_requests.key_by(extract_identity_key).process(
         FraudDetector(),
         output_type=Types.STRING(),
     )
