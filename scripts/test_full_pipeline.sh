@@ -7,6 +7,24 @@ LOG_DIR="/tmp/opencode/request-fraud-tests/full-pipeline"
 
 mkdir -p "$LOG_DIR"
 
+wait_for_log() {
+  local file=$1
+  local pattern=$2
+  local timeout_seconds=${3:-40}
+  local elapsed=0
+
+  while (( elapsed < timeout_seconds )); do
+    if [[ -f "$file" ]] && grep -F "$pattern" "$file" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  printf 'Timed out waiting for %s in %s\n' "$pattern" "$file" >&2
+  return 1
+}
+
 cleanup() {
   local status=$?
 
@@ -74,13 +92,11 @@ producer.flush()
 producer.close()
 PY
 
-sleep 6
-
 printf 'Validating logs...\n'
-grep -F "FORWARD req_id=script-full-pipeline -> ad.injection" "$LOG_DIR/shallow.log" >/dev/null
-grep -F "[ad-injection] finished req_id=script-full-pipeline" "$LOG_DIR/ad_injection.log" >/dev/null
-grep -F '"req_id": "script-full-pipeline"' "$LOG_DIR/fraud.log" >/dev/null
-grep -F '"verdict": "clean"' "$LOG_DIR/fraud.log" >/dev/null
-grep -F "[moderation-detection] placeholder moderation detection finished req_id=script-full-pipeline" "$LOG_DIR/moderation.log" >/dev/null
+wait_for_log "$LOG_DIR/shallow.log" "FORWARD req_id=script-full-pipeline -> ad.injection"
+wait_for_log "$LOG_DIR/ad_injection.log" "[ad-injection] finished req_id=script-full-pipeline"
+wait_for_log "$LOG_DIR/fraud.log" '"req_id": "script-full-pipeline"'
+wait_for_log "$LOG_DIR/fraud.log" '"verdict": "clean"'
+wait_for_log "$LOG_DIR/moderation.log" "[moderation-detection] placeholder moderation detection finished req_id=script-full-pipeline"
 
 printf 'Full pipeline test passed. Logs are in %s\n' "$LOG_DIR"
