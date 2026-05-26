@@ -9,7 +9,8 @@ evaluation of fraud rules under both normal and suspicious traffic scenarios.
 
 | Path | Role |
 | --- | --- |
-| `datasets/WildChat/train/` | Real chat-conversation dataset (two Arrow shards, 529k conversations) |
+| `datasets/WildChat/train/` | Transformed user-prompt dataset used by the simulator |
+| `datasets/WildChat/train_conversation_backup/` | Backup of the original conversation-level WildChat train split |
 | `datasets/geo/GeoLite2-City.mmdb` | MaxMind GeoIP database for IP-to-location resolution |
 | `datasets/geo/GeoLite2-Country.mmdb` | MaxMind GeoIP country-only database |
 | `spark_service/data/request_logs.json` | Historical log input for Spark analytics and ML training |
@@ -31,15 +32,15 @@ It provides:
   suitable as session and publisher identifiers.
 - **Two models** — `gpt-3.5-turbo` (64%) and `gpt-4` (36%).
 
-### WildChat Schema (as used by the simulator)
+### WildChat Conversation Backup Schema
 
 | Column | Type | Simulator mapping |
 |---|---|---|
-| `conversation_id` | string | `session_id`, `publisher_id` |
-| `timestamp` | timestamp[UTC] | `event_time` |
-| `conversation[0].content` | string | `prompt` (first user turn) |
-| `language` | string | `language` |
-| `conversation` | list[struct] | Validated for user role + non-empty content |
+| `conversation_id` | string | Source conversation identity |
+| `timestamp` | timestamp[UTC] | Base time for transformed prompt rows |
+| `conversation[0].content` | string | First available user prompt |
+| `language` | string | Language |
+| `conversation` | list[struct] | Source list expanded into user-prompt rows |
 
 ### WildChat Row Counts
 
@@ -84,24 +85,32 @@ Accumulated request logs that include fraud labels or verdicts.
 Curated subsets used to compare rule changes, model versions, or attack-mode
 performance.
 
-## Current Request Record Shape
+## Current Transformed Prompt Record Shape
 
-The simulator emits events with these top-level fields:
+The transformed simulator input dataset now stores one row per user prompt with
+these fields:
+
+| Field | Use |
+| --- | --- |
+| `conversation_id` | Session identity reused across prompts from the same source conversation |
+| `timestamp` | Original conversation timestamp plus a cumulative random `1-120s` offset per user turn |
+| `language` | Per-language fraud and abuse analysis |
+| `prompt` | User-turn content used by the simulator |
+| `publisher_id` | Traffic source identity, currently equal to `conversation_id` |
+
+The simulator then enriches each dataset row into a request event by adding:
 
 | Field | Use |
 | --- | --- |
 | `req_id` | Random request identity (16-byte hex) |
-| `prompt` | Content-based fraud and moderation analysis |
-| `language` | Per-language fraud and abuse analysis |
 | `request_context.user_ip` | Client IP for frequency and grouping analysis |
-| `request_context.session_id` | Session identity (= WildChat conversation_id) |
+| `request_context.session_id` | Session identity (= `conversation_id`) |
 | `request_context.user_agent` | Device and client identification |
 | `optional_context.asn` | Network-level feature engineering |
 | `optional_context.country` | Geo-based feature engineering |
 | `optional_context.region` | Geo-based feature engineering |
 | `optional_context.city` | Geo-based feature engineering |
 | `request_configuration.wrapping_type` | Request format signal (`json`/`txt`/`xml`) |
-| `publisher_id` | Traffic source identity (= WildChat conversation_id) |
 | `fraud_verdict` | Batch training label source (populated downstream) |
 
 ## Label Strategy
