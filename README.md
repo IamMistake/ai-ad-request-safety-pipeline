@@ -9,7 +9,7 @@ pipelines for analysis/training.
 - Kafka request simulator: `kafka/producers/request_simulator.py`
 - Shallow fraud detector (Redis-backed): `shallow_fraud_detection/shallow_fraud_detector.py`
 - Debug consumer: `test_consumer.py`
-- Flink streaming example: `flink_service/fraud_detection.py`
+- Flink streaming fraud processor: `flink_service/fraud_detection.py`
 - Spark training example + sample data: `spark_service/spark_training.py`
 
 ## Documentation
@@ -63,7 +63,6 @@ python test_consumer.py
 
 ## Kafka topics
 
-- `ad.request_raw`
 - `ad.injection`
 - `ad.cancel`
 - `fraud.verdicts`

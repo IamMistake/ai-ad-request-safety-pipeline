@@ -35,7 +35,7 @@ python -u "$ROOT_DIR/shallow_fraud_detection/shallow_fraud_consumer.py" > "$LOG_
 SHALLOW_PID=$!
 python -u "$ROOT_DIR/pipeline_consumers/ad_injection_consumer.py" > "$LOG_DIR/ad_injection.log" 2>&1 &
 AD_PID=$!
-python -u "$ROOT_DIR/pipeline_consumers/fraud_detection_consumer.py" > "$LOG_DIR/fraud.log" 2>&1 &
+python -u "$ROOT_DIR/flink_service/fraud_detection.py" > "$LOG_DIR/fraud.log" 2>&1 &
 FRAUD_PID=$!
 python -u "$ROOT_DIR/pipeline_consumers/moderation_consumer.py" > "$LOG_DIR/moderation.log" 2>&1 &
 MOD_PID=$!
@@ -79,7 +79,8 @@ sleep 6
 printf 'Validating logs...\n'
 grep -F "FORWARD req_id=script-full-pipeline -> ad.injection" "$LOG_DIR/shallow.log" >/dev/null
 grep -F "[ad-injection] finished req_id=script-full-pipeline" "$LOG_DIR/ad_injection.log" >/dev/null
-grep -F "[fraud-detection] placeholder fraud detection finished req_id=script-full-pipeline" "$LOG_DIR/fraud.log" >/dev/null
+grep -F '"req_id": "script-full-pipeline"' "$LOG_DIR/fraud.log" >/dev/null
+grep -F '"verdict": "clean"' "$LOG_DIR/fraud.log" >/dev/null
 grep -F "[moderation-detection] placeholder moderation detection finished req_id=script-full-pipeline" "$LOG_DIR/moderation.log" >/dev/null
 
 printf 'Full pipeline test passed. Logs are in %s\n' "$LOG_DIR"

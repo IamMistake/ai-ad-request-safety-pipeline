@@ -11,8 +11,8 @@ partitions and consumer groups.
 | Topic | Purpose | Current reference | Status |
 | --- | --- | --- | --- |
 | `shallow-fraud-detection` | Prototype ingress topic for simulator output | `kafka/producers/request_simulator.py`, `test_consumer.py` | Initial pipeline stage |
-| `ad.injection` | Shared downstream request topic for ad injection, fraud, and moderation consumers | `shallow_fraud_detection/shallow_fraud_consumer.py`, `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/fraud_detection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `flink_service/fraud_detection.py` | Active in prototype |
-| `ad.cancel` | Cross-consumer cancellation signal for in-flight downstream work and Flink-side request suppression | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/fraud_detection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `flink_service/fraud_detection.py` | Active in prototype |
+| `ad.injection` | Shared downstream request topic for ad injection, moderation, and Flink fraud processing | `shallow_fraud_detection/shallow_fraud_consumer.py`, `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `flink_service/fraud_detection.py` | Active in prototype |
+| `ad.cancel` | Cross-consumer cancellation signal for in-flight downstream work and Flink-side request suppression | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `flink_service/fraud_detection.py` | Active in prototype |
 | `ad.request_raw` | Older raw request topic referenced by the initial Flink prototype | `README.md` | Legacy prototype reference |
 | `fraud.verdicts` | Fraud decisions emitted by the Flink fraud processor | `flink_service/fraud_detection.py`, `test_consumer.py` | Active in prototype |
 | `moderation.verdicts` | Prompt moderation decisions | `README.md` | Planned topic |
@@ -48,7 +48,6 @@ Consumer groups are a key streaming concept for this project.
 | Consumer group idea | Purpose |
 | --- | --- |
 | `ad-injection-consumer` | Placeholder ad injection worker that receives all fan-out events |
-| `fraud-detection-consumer` | Placeholder fraud worker that receives all fan-out events |
 | `moderation-detection-consumer` | Placeholder moderation worker that receives all fan-out events |
 | `flink-fraud-consumer` | Current Flink group for downstream fraud analysis |
 | fraud-processing groups | Scale real-time fraud processors horizontally |
@@ -88,7 +87,7 @@ flowchart LR
 ## Implementation Notes
 
 - The shallow consumer currently forwards allowed events to `ad.injection`.
-- The ad injection, placeholder fraud, and placeholder moderation consumers each use a distinct consumer group so they all receive the same request in parallel.
+- The ad injection placeholder, moderation placeholder, and Flink fraud processor each use distinct consumer groups so they all receive the same request in parallel.
 - Each downstream consumer also listens to `ad.cancel` and can stop in-flight work when another consumer emits a matching cancel message.
 - The canonical Flink fraud job consumes `ad.injection` and `ad.cancel`, emits `fraud.verdicts`, and can emit `ad.cancel`.
 - If Flink has already observed an `ad.cancel` for a `req_id`, later `ad.injection` events for that same `req_id` are dropped before fraud scoring.

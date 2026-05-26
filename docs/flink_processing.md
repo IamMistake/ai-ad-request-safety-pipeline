@@ -5,7 +5,8 @@
 `flink_service/fraud_detection.py` is the current real-time fraud detection
 service. It consumes shallow-approved request events plus cancel signals from
 Kafka, ignores future requests whose `req_id` has already been cancelled,
-applies lightweight keyed fraud rules, emits verdicts, and can cancel
+assigns event-time watermarks from request payload timestamps, applies keyed
+fraud rules plus an event-time burst check, emits verdicts, and can cancel
 downstream work for hard fraud cases.
 
 ## Current Entry Point
@@ -22,11 +23,12 @@ flowchart LR
     H[KafkaSource ad.cancel] --> I[Tag cancel events]
     B --> C[Key by req_id and drop future cancelled requests]
     I --> C
-    C --> D[Key by ip_hash or user_ip]
-    D --> E[Apply keyword and keyed IP-frequency rules]
-    E --> F[Produce verdict payload]
-    F --> G[fraud.verdicts]
-    F --> J[ad.cancel for fraud verdicts]
+    C --> D[Assign event-time watermarks from event_time]
+    D --> E[Key by ip_hash or user_ip]
+    E --> F[Apply keyword, keyed IP-frequency, and event-time burst rules]
+    F --> G[Produce verdict payload]
+    G --> H[fraud.verdicts]
+    G --> J[ad.cancel for fraud verdicts]
 ```
 
 ## Current Rule Set
@@ -35,6 +37,7 @@ flowchart LR
 | --- | --- | --- |
 | Scam prompt keywords | Flag requests containing known suspicious phrases | `SCAM_KEYWORDS` |
 | IP request frequency | Flag repeated requests from the same IP identity | keyed Flink `ValueState` |
+| IP event-time burst | Flag more than 8 requests from one identity in a 60-second event-time window | keyed Flink `ListState` + request timestamps |
 | Shallow score escalation | Upgrade already-risky requests using shallow score | `shallow_fraud.fraud_score` |
 
 ## Current Implementation Notes
@@ -48,10 +51,12 @@ The current file performs the following steps:
 5. Reads string events with `SimpleStringSchema`.
 6. Keys the merged stream by `req_id` and stores cancel state.
 7. Drops any later request event for a `req_id` that has already been cancelled.
-8. Keys surviving request events by `shallow_fraud.identities.ip_hash` with a `user_ip` fallback.
-9. Applies keyed rule-based fraud logic with managed state.
-10. Publishes verdict events to `fraud.verdicts`.
-11. Publishes `ad.cancel` for hard fraud verdicts.
+8. Assigns bounded out-of-orderness watermarks from `event_time` after cancel suppression.
+9. Keys surviving request events by `shallow_fraud.identities.ip_hash` with a `user_ip` fallback.
+10. Applies keyed rule-based fraud logic with managed state.
+11. Counts recent requests inside a 60-second event-time window per identity.
+12. Publishes verdict events to `fraud.verdicts`.
+13. Publishes `ad.cancel` for hard fraud verdicts.
 
 ## Current Fraud Signals In Code
 
@@ -59,6 +64,7 @@ The current service scores and classifies requests using:
 
 - the prompt contains a scam keyword
 - the keyed count for a specific IP identity exceeds `15`
+- more than `8` requests arrive for the same identity inside the trailing `60` event-time seconds
 - the shallow fraud score is already elevated enough to escalate risk
 
 Current keyword list:
@@ -82,6 +88,8 @@ The job currently emits a JSON verdict payload with:
 - `publisher_id`
 - `prompt` preview
 - `count_from_ip`
+- `window_request_count`
+- `window_size_seconds`
 - `fraud_score`
 - `reasons`
 - `ip_hash`
@@ -103,16 +111,18 @@ managed Flink `ValueState` with TTL for per-identity request counters.
 
 ### Event time and watermarking
 
-The current job uses `WatermarkStrategy.no_watermarks()`. That keeps the first
-prototype simple. The architecture still supports later adoption of:
+The current job assigns bounded out-of-orderness watermarks from each request's
+`event_time` after the cancel filter. The current default lateness allowance is
+`5` seconds.
 
-- event-time processing
-- watermarking
+This phase adds the first event-time aware fraud signal while keeping the rest
+of the service simple. The architecture still supports later adoption of:
+
 - sliding windows
 - tumbling windows
 
-These concepts matter for rate spikes, burst analysis, and session-level fraud
-patterns.
+These concepts matter for rate spikes, burst analysis, and later session-level
+fraud patterns.
 
 ## Recommended Future Enhancements Within The Same Direction
 
