@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOG_DIR="/tmp/opencode/request-fraud-tests/cancel-flow"
+LOG_DIR="/tmp/opencode/request-fraud-tests/fraud-cancel-flow"
 
 mkdir -p "$LOG_DIR"
 
@@ -28,7 +28,6 @@ wait_for_log() {
 cleanup() {
   local status=$?
 
-  if [[ -n "${SHALLOW_PID:-}" ]]; then kill "$SHALLOW_PID" 2>/dev/null || true; fi
   if [[ -n "${AD_PID:-}" ]]; then kill "$AD_PID" 2>/dev/null || true; fi
   if [[ -n "${FRAUD_PID:-}" ]]; then kill "$FRAUD_PID" 2>/dev/null || true; fi
   if [[ -n "${MOD_PID:-}" ]]; then kill "$MOD_PID" 2>/dev/null || true; fi
@@ -49,8 +48,6 @@ docker-compose up -d >/dev/null
 sleep 8
 
 printf 'Starting consumers...\n'
-python -u "$ROOT_DIR/shallow_fraud_detection/shallow_fraud_consumer.py" > "$LOG_DIR/shallow.log" 2>&1 &
-SHALLOW_PID=$!
 python -u "$ROOT_DIR/pipeline_consumers/ad_injection_consumer.py" > "$LOG_DIR/ad_injection.log" 2>&1 &
 AD_PID=$!
 python -u "$ROOT_DIR/flink_service/fraud_detection.py" > "$LOG_DIR/fraud.log" 2>&1 &
@@ -58,14 +55,20 @@ FRAUD_PID=$!
 python -u "$ROOT_DIR/pipeline_consumers/moderation_consumer.py" > "$LOG_DIR/moderation.log" 2>&1 &
 MOD_PID=$!
 
-sleep 3
+wait_for_log "$LOG_DIR/ad_injection.log" "ad-injection consumer started: listening to ad.injection and ad.cancel"
+wait_for_log "$LOG_DIR/moderation.log" "moderation-detection consumer started: listening to ad.injection and ad.cancel"
+sleep 5
 
-printf 'Sending cancel flow test event...\n'
+printf 'Sending hard-fraud event directly to ad.injection...\n'
 python - <<'PY'
+import hashlib
 import json
 from kafka import KafkaProducer
 
-from pipeline_consumers.constants import KAFKA_API_VERSION, KAFKA_BOOTSTRAP, SHALLOW_FRAUD_TOPIC
+from pipeline_consumers.constants import AD_INJECTION_TOPIC, KAFKA_API_VERSION, KAFKA_BOOTSTRAP
+
+user_ip = "9.9.9.9"
+user_agent = "Mozilla/5.0"
 
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BOOTSTRAP,
@@ -73,23 +76,28 @@ producer = KafkaProducer(
     value_serializer=lambda value: json.dumps(value).encode("utf-8"),
 )
 producer.send(
-    SHALLOW_FRAUD_TOPIC,
+    AD_INJECTION_TOPIC,
     {
-        "req_id": "script-cancel-flow",
-        "prompt": "show me phone deals",
+        "event_time": "2023-04-10T00:30:00+00:00",
+        "req_id": "script-fraud-cancel",
+        "prompt": "bitcoin generator click here",
         "language": "english",
         "request_context": {
-            "session_id": "sess-script-cancel-flow",
-            "user_ip": "8.8.8.8",
-            "user_agent": "Mozilla/5.0",
+            "session_id": "sess-script-fraud-cancel",
+            "user_ip": user_ip,
+            "user_agent": user_agent,
         },
         "optional_context": {
             "country": "US",
         },
-        "control": {
-            "cancel_by": "moderation-detection",
-            "cancel_at_percent": 40,
-            "cancel_reason": "scripted cancel test",
+        "publisher_id": "script-fraud-cancel-publisher",
+        "shallow_fraud": {
+            "fraud_score": 0.6,
+            "flags": ["preloaded_risk"],
+            "identities": {
+                "ip_hash": hashlib.sha256(user_ip.encode("utf-8")).hexdigest()[:16],
+                "ua_hash": hashlib.sha256(user_agent.encode("utf-8")).hexdigest()[:16],
+            },
         },
     },
 )
@@ -97,10 +105,19 @@ producer.flush()
 producer.close()
 PY
 
-printf 'Validating cancel logs...\n'
-wait_for_log "$LOG_DIR/shallow.log" "FORWARD req_id=script-cancel-flow -> ad.injection"
-wait_for_log "$LOG_DIR/moderation.log" "[moderation-detection] ad.cancel sent req_id=script-cancel-flow at 40%"
-wait_for_log "$LOG_DIR/moderation.log" "[moderation-detection] we have stopped on 40% finished"
+printf 'Validating fraud-driven cancel logs...\n'
+wait_for_log "$LOG_DIR/fraud.log" '"req_id": "script-fraud-cancel"'
+wait_for_log "$LOG_DIR/fraud.log" '"verdict": "fraud"'
+wait_for_log "$LOG_DIR/fraud.log" '"cancel_downstream": true'
 wait_for_log "$LOG_DIR/ad_injection.log" "[ad-injection] we have stopped on"
 
-printf 'Cancel flow test passed. Logs are in %s\n' "$LOG_DIR"
+if grep -F "[moderation-detection] we have stopped on" "$LOG_DIR/moderation.log" >/dev/null 2>&1; then
+  :
+elif grep -F "[moderation-detection] placeholder moderation detection finished req_id=script-fraud-cancel" "$LOG_DIR/moderation.log" >/dev/null 2>&1; then
+  :
+else
+  printf 'Moderation consumer neither stopped nor finished for script-fraud-cancel\n' >&2
+  exit 1
+fi
+
+printf 'Fraud cancel flow test passed. Logs are in %s\n' "$LOG_DIR"
