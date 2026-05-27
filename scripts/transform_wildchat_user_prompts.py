@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import random
 from datetime import timedelta
@@ -16,6 +17,20 @@ OUTPUT_BATCH_SIZE = 5000
 OFFSET_SECONDS_MIN = 1
 OFFSET_SECONDS_MAX = 120
 SEED = 1337
+PUBLISHER_IDS = [f"publisher_{index:02d}" for index in range(1, 11)]
+PUBLISHER_WEIGHTS = [25, 18, 14, 10, 8, 7, 6, 5, 4, 3]
+
+
+def assign_publisher_id(conversation_id: str) -> str:
+    bucket = int(hashlib.sha256(conversation_id.encode("utf-8")).hexdigest(), 16) % 100
+    cumulative_weight = 0
+
+    for publisher_id, weight in zip(PUBLISHER_IDS, PUBLISHER_WEIGHTS, strict=True):
+        cumulative_weight += weight
+        if bucket < cumulative_weight:
+            return publisher_id
+
+    return PUBLISHER_IDS[-1]
 
 
 def normalise_conversation(conversation: Any) -> list[dict[str, Any]]:
@@ -45,6 +60,7 @@ def build_user_prompt_rows(row: dict[str, Any], rnd: random.Random) -> list[dict
     if not hasattr(event_time, "isoformat"):
         return []
 
+    publisher_id = assign_publisher_id(str(conversation_id))
     prompt_rows = []
     cumulative_offset_seconds = 0
 
@@ -63,7 +79,7 @@ def build_user_prompt_rows(row: dict[str, Any], rnd: random.Random) -> list[dict
                 "timestamp": (event_time + timedelta(seconds=cumulative_offset_seconds)).isoformat(),
                 "language": "" if language is None else str(language),
                 "prompt": content,
-                "publisher_id": str(conversation_id),
+                "publisher_id": publisher_id,
             }
         )
 
@@ -135,6 +151,10 @@ def transform_dataset() -> dict[str, int]:
         "output_rows": emitted_rows,
         "format": "user-prompts-only",
         "timestamp_offsets": "cumulative-random-1-120-seconds",
+        "publisher_distribution": {
+            publisher_id: weight for publisher_id, weight in zip(PUBLISHER_IDS, PUBLISHER_WEIGHTS, strict=True)
+        },
+        "publisher_assignment": "deterministic-weighted-by-conversation-id",
     }
     (OUTPUT_DATASET_PATH / "dataset_info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     (OUTPUT_DATASET_PATH / "state.json").write_text(json.dumps({"_data_files": [{"filename": "data-00000-of-00001.arrow"}]}, indent=2) + "\n", encoding="utf-8")

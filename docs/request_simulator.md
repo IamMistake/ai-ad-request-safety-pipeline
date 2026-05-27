@@ -97,7 +97,7 @@ The simulator emits request events with the following shape:
     "age": 29,
     "gender": "female"
   },
-  "publisher_id": "<WildChat conversation_id>"
+  "publisher_id": "publisher_01"
 }
 ```
 
@@ -117,7 +117,7 @@ The simulator emits request events with the following shape:
 | `optional_context.asn` | Synthetic random `int` in `[1000, 65000]` |
 | `optional_context.age` | Synthetic random `int` in `[18, 70]` |
 | `optional_context.gender` | Random pick from `["female", "male"]` |
-| `publisher_id` | Transformed dataset `publisher_id` (currently the same as `conversation_id`) |
+| `publisher_id` | Transformed dataset `publisher_id` from a deterministic weighted 10-publisher pool |
 
 ## Data Source Comparison
 
@@ -170,7 +170,7 @@ That transform:
 
 - keeps only user turns
 - repeats `conversation_id` across prompts from the same conversation
-- sets `publisher_id` to `conversation_id`
+- assigns one of 10 repeating publisher IDs using a deterministic weighted mapping per conversation (`25/18/14/10/8/7/6/5/4/3`)
 - adds cumulative random `1-120s` timestamp offsets per conversation
 
 ## Engineering Guidance

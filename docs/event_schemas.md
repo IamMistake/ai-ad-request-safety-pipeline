@@ -244,15 +244,57 @@ Source: `pipeline_consumers/common.py`
 
 ## 6. Fraud Verdict Event
 
-`fraud.verdicts` exists as a topic constant and is observed by the debug
-consumer, but there is no implemented producer for this topic yet in the current
-pipeline code.
+This is the JSON emitted by the Flink fraud processor to `fraud.verdicts`.
 
-Current status:
+Source: `flink_service/detector.py`
 
-- topic exists: `pipeline_consumers/constants.py`
-- debug consumer listens to it: `test_consumer.py`
-- final verdict JSON shape is not yet standardized in executable code
+```json
+{
+  "req_id": "5e87cd8f53dff5e7...",
+  "event_time": "2023-04-10T00:01:08+00:00",
+  "publisher_id": "conversation-id",
+  "verdict": "suspicious",
+  "fraud_score": 0.8,
+  "reasons": ["ip_window_burst", "prompt_similarity_burst"],
+  "count_from_ip": 17,
+  "window_request_count": 9,
+  "window_size_seconds": 60,
+  "window_slide_seconds": null,
+  "similar_prompt_count": 4,
+  "prompt_similarity_window_seconds": 60,
+  "normalized_prompt_hash": "e4f9d99f212f6f17",
+  "ip_hash": "abcd1234ef567890",
+  "user_ip": "158.37.13.4",
+  "prompt_preview": "Write a very long, elaborate...",
+  "shallow_fraud_score": 0.35,
+  "shallow_fraud_flags": ["ip_burst"],
+  "cancel_downstream": false
+}
+```
+
+### Fraud Verdict Fields
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `req_id` | string or null | Request identifier |
+| `event_time` | string | Request timestamp passed through from input |
+| `publisher_id` | string | Request publisher/source identifier |
+| `verdict` | string | `clean`, `suspicious`, `fraud`, or `error` |
+| `fraud_score` | number | Rounded fraud score from stream-time logic |
+| `reasons` | array of strings | Triggered stream-time rule names |
+| `count_from_ip` | integer | Running keyed request count |
+| `window_request_count` | integer or null | Requests seen in trailing event-time window |
+| `window_size_seconds` | integer | Burst window size |
+| `window_slide_seconds` | null | Reserved output field (not currently used) |
+| `similar_prompt_count` | integer or null | Repetitions of the same normalized prompt hash in trailing window |
+| `prompt_similarity_window_seconds` | integer | Prompt-similarity window size |
+| `normalized_prompt_hash` | string | Short SHA-256 hash of normalized prompt |
+| `ip_hash` | string | Identity hash from shallow detector when available |
+| `user_ip` | string | Raw IP fallback identity field |
+| `prompt_preview` | string | First 80 chars of prompt |
+| `shallow_fraud_score` | number | Shallow layer fraud score copied from input |
+| `shallow_fraud_flags` | array of strings | Shallow flags copied from input |
+| `cancel_downstream` | boolean | Whether Flink should emit `ad.cancel` |
 
 ## Current Topic Flow
 

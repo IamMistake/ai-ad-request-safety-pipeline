@@ -25,7 +25,7 @@ flowchart LR
     I --> C
     C --> D[Assign event-time watermarks from event_time]
     D --> E[Key by ip_hash or user_ip]
-    E --> F[Apply keyword, keyed IP-frequency, and event-time burst rules]
+    E --> F[Apply keyed IP-frequency, event-time burst, and prompt-similarity rules]
     F --> G[Produce verdict payload]
     G --> H[fraud.verdicts]
     G --> J[ad.cancel for fraud verdicts]
@@ -35,9 +35,9 @@ flowchart LR
 
 | Rule | Description | Current source |
 | --- | --- | --- |
-| Scam prompt keywords | Flag requests containing known suspicious phrases | `SCAM_KEYWORDS` |
 | IP request frequency | Flag repeated requests from the same IP identity | keyed Flink `ValueState` |
 | IP event-time burst | Flag more than 8 requests from one identity in a 60-second event-time window | keyed Flink `ListState` + request timestamps |
+| Prompt similarity burst | Flag repeated normalized prompts from one identity in a 60-second event-time window | keyed Flink `ListState` + normalized prompt hash |
 | Shallow score escalation | Upgrade already-risky requests using shallow score | `shallow_fraud.fraud_score` |
 
 ## Current Implementation Notes
@@ -62,22 +62,17 @@ The current file performs the following steps:
 
 The current service scores and classifies requests using:
 
-- the prompt contains a scam keyword
 - the keyed count for a specific IP identity exceeds `15`
 - more than `8` requests arrive for the same identity inside the trailing `60` event-time seconds
+- more than `3` requests from the same identity share the same normalized prompt hash inside the trailing `60` event-time seconds
 - the shallow fraud score is already elevated enough to escalate risk
 
-Current keyword list:
+Current prompt normalization for similarity checks:
 
-- `hack`
-- `bitcoin`
-- `generator`
-- `credit card`
-- `multiplier`
-- `loan`
-- `scam`
-- `earn money fast`
-- `click here`
+- lowercase prompt text
+- remove punctuation
+- collapse repeated whitespace
+- hash the normalized prompt and compare repeated hashes per keyed identity
 
 ## Current Output Shape
 
@@ -90,6 +85,9 @@ The job currently emits a JSON verdict payload with:
 - `count_from_ip`
 - `window_request_count`
 - `window_size_seconds`
+- `similar_prompt_count`
+- `prompt_similarity_window_seconds`
+- `normalized_prompt_hash`
 - `fraud_score`
 - `reasons`
 - `ip_hash`
