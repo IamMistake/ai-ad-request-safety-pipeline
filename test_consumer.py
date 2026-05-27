@@ -8,6 +8,7 @@ from pipeline_consumers.constants import (
     FRAUD_VERDICTS_TOPIC,
     KAFKA_API_VERSION,
     KAFKA_BOOTSTRAP,
+    MODERATION_VERDICTS_TOPIC,
     SHALLOW_FRAUD_TOPIC,
 )
 
@@ -16,6 +17,7 @@ TOPICS = [
     AD_INJECTION_TOPIC,
     AD_CANCEL_TOPIC,
     FRAUD_VERDICTS_TOPIC,
+    MODERATION_VERDICTS_TOPIC,
 ]
 
 def main():
@@ -49,6 +51,8 @@ def main():
             print("placeholder: received cancel signal for downstream consumers")
         elif msg.topic == FRAUD_VERDICTS_TOPIC:
             print("placeholder: received fraud verdict event")
+        elif msg.topic == MODERATION_VERDICTS_TOPIC:
+            print("received moderation verdict event")
 
 
 if __name__ == "__main__":

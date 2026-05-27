@@ -296,6 +296,38 @@ Source: `flink_service/detector.py`
 | `shallow_fraud_flags` | array of strings | Shallow flags copied from input |
 | `cancel_downstream` | boolean | Whether Flink should emit `ad.cancel` |
 
+## 7. Moderation Verdict Event
+
+This is the JSON emitted by moderation consumer to `moderation.verdicts`.
+
+Source: `pipeline_consumers/moderation_consumer.py`
+
+```json
+{
+  "req_id": "5e87cd8f53dff5e7...",
+  "event_time": "2023-04-10T00:01:08+00:00",
+  "publisher_id": "conversation-id",
+  "verdict": "flagged",
+  "reasons": ["scam_keyword"],
+  "matched_keywords": ["bitcoin", "click here"],
+  "prompt_preview": "Write a very long, elaborate...",
+  "cancel_downstream": true
+}
+```
+
+### Moderation Verdict Fields
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `req_id` | string or null | Request identifier |
+| `event_time` | string | Request timestamp passed through from input |
+| `publisher_id` | string | Request publisher/source identifier |
+| `verdict` | string | `clean` or `flagged` |
+| `reasons` | array of strings | Triggered moderation rule names |
+| `matched_keywords` | array of strings | Keywords that matched prompt content |
+| `prompt_preview` | string | First 80 chars of prompt |
+| `cancel_downstream` | boolean | Whether moderation emitted `ad.cancel` |
+
 ## Current Topic Flow
 
 ```text
@@ -303,5 +335,7 @@ request simulator
   -> shallow-fraud-detection
   -> shallow fraud detector result
   -> ad.injection (allowed requests with shallow_fraud block)
-  -> ad.cancel (placeholder downstream cancellation)
+  -> fraud.verdicts
+  -> moderation.verdicts
+  -> ad.cancel (from fraud and moderation detections)
 ```
