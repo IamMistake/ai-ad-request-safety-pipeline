@@ -39,19 +39,25 @@ docker-compose up -d
 pip install -r requirements.txt
 ```
 
-3) Run the request simulator prototype
+3) Build the transformed simulator dataset
+
+```bash
+python scripts/transform_wildchat_user_prompts.py
+```
+
+4) Run the request simulator prototype
 
 ```bash
 python kafka/producers/request_simulator.py
 ```
 
-4) (Optional) Run the multi-topic debug consumer
+5) (Optional) Run the multi-topic debug consumer
 
 ```bash
 python test_consumer.py
 ```
 
-5) Run the scripted pipeline tests
+6) Run the scripted pipeline tests
 
 ```bash
 ./scripts/test_full_pipeline.sh
@@ -59,6 +65,10 @@ python test_consumer.py
 
 ```bash
 ./scripts/test_cancel_flow.sh
+```
+
+```bash
+./scripts/test_fraud_cancel_flow.sh
 ```
 
 ## Kafka topics

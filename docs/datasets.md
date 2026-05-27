@@ -96,7 +96,7 @@ these fields:
 | `timestamp` | Original conversation timestamp plus a cumulative random `1-120s` offset per user turn |
 | `language` | Per-language fraud and abuse analysis |
 | `prompt` | User-turn content used by the simulator |
-| `publisher_id` | Traffic source identity, currently equal to `conversation_id` |
+| `publisher_id` | Traffic source identity assigned from a repeating 10-publisher weighted pool and kept stable per conversation (`25/18/14/10/8/7/6/5/4/3`) |
 
 The simulator then enriches each dataset row into a request event by adding:
 

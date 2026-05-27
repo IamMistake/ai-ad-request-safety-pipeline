@@ -11,7 +11,7 @@ prototype stage, and what is planned next.
 | --- | --- | --- |
 | Project architecture | Established | Core pipeline direction is documented and preserved |
 | Docker infrastructure | Implemented | Kafka, Zookeeper, Redis, Kafka UI, and Redis Commander are present |
-| Request simulator | Implemented as ingestion prototype | Streams WildChat Arrow rows to Kafka with GeoLite2-enriched geo context, random IPs, and real prompt text |
+| Request simulator | Implemented as ingestion prototype | Streams transformed WildChat user-prompt Arrow rows to Kafka with GeoLite2-enriched geo context, random IPs, and real prompt text |
 | Shallow fraud detector | Prototype implementation | Redis-backed session and IP last-seen checks, shallow scoring, and allow/deny forwarding are implemented |
 | Debug consumer | Implemented for local inspection | Useful for observing local topic traffic |
 | Flink fraud processor | Implemented as current main runtime processor | Consumes `ad.injection` and `ad.cancel`, suppresses future cancelled requests, emits `fraud.verdicts`, and can publish `ad.cancel` |
@@ -29,6 +29,7 @@ prototype stage, and what is planned next.
 | Debug consumer | `test_consumer.py` |
 | Full pipeline test script | `scripts/test_full_pipeline.sh` |
 | Cancel flow test script | `scripts/test_cancel_flow.sh` |
+| Fraud-driven cancel flow test script | `scripts/test_fraud_cancel_flow.sh` |
 | Shallow Kafka consumer/forwarder | `shallow_fraud_detection/shallow_fraud_consumer.py` |
 | Ad injection placeholder consumer | `pipeline_consumers/ad_injection_consumer.py` |
 | Placeholder moderation detection consumer | `pipeline_consumers/moderation_consumer.py` |
@@ -37,14 +38,15 @@ prototype stage, and what is planned next.
 
 | Component | File | Current state |
 | --- | --- | --- |
-| Request simulator | `kafka/producers/request_simulator.py` | Reads WildChat Arrow shards, builds request events with real prompts, random IPs from GeoLite2, synthetic enrichment (UA, wrapping, optional_context), and publishes to Kafka |
+| Request simulator | `kafka/producers/request_simulator.py` | Reads transformed WildChat user-prompt Arrow shards, builds request events with real prompts, random IPs from GeoLite2, synthetic enrichment (UA, wrapping, optional_context), and publishes to Kafka |
+| WildChat user-prompt transform | `scripts/transform_wildchat_user_prompts.py` | Expands conversation rows into user-prompt rows, preserves repeated `conversation_id` values, applies cumulative random `1-120s` timestamp offsets, and rewrites the simulator input dataset |
 | Simulator constants | `kafka/producers/simulator_constants.py` | Dataset path, GeoLite2 path, expanded UA list, wrapping types, required source fields for WildChat |
 | Simulator event builder | `kafka/producers/simulator_events.py` | Validates WildChat rows (conversation_id, conversation, timestamp), extracts first user turn as prompt, builds event JSON |
 | Simulator lookups | `kafka/producers/simulator_lookups.py` | Random public IP generation with GeoLite2 resolution, UA/wrapping pickers, optional_context builder |
 | Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Hashing, Redis TTL state, UA heuristics, negative keyword matching, language-country checks, shallow scoring, and nested original-request return payloads are implemented |
 | Downstream fan-out placeholders | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py` | Two independent placeholder consumers subscribe to `ad.injection`, process in parallel with distinct consumer groups, and can interrupt each other via `ad.cancel` while Flink performs the real fraud analysis |
-| Flink fraud processor | `flink_service/fraud_detection.py` | Consumes `ad.injection` and `ad.cancel`, keys first by `req_id` to suppress future cancelled requests, assigns event-time watermarks from request payloads, then keys by shallow `ip_hash` with a `user_ip` fallback, uses managed Flink state for request counts and a 60-second event-time burst check, emits `fraud.verdicts`, and publishes `ad.cancel` on hard fraud verdicts |
-| Scripted pipeline tests | `scripts/test_full_pipeline.sh`, `scripts/test_cancel_flow.sh` | Bring up infra, start the shallow forwarder, Flink fraud processor, and placeholder downstream consumers, publish a representative event, validate expected log output, and clean up spawned processes |
+| Flink fraud processor | `flink_service/fraud_detection.py` | Consumes `ad.injection` and `ad.cancel`, keys first by `req_id` to suppress future cancelled requests, assigns event-time watermarks from request payloads, then keys by shallow `ip_hash` with a `user_ip` fallback, uses managed Flink state for request counts, a 60-second event-time burst check, and repeated normalized-prompt hash similarity checks, emits `fraud.verdicts`, and publishes `ad.cancel` on hard fraud verdicts |
+| Scripted pipeline tests | `scripts/test_full_pipeline.sh`, `scripts/test_cancel_flow.sh`, `scripts/test_fraud_cancel_flow.sh` | Bring up infra, start the relevant consumers, publish representative events, validate expected log output, and clean up spawned processes, including a deterministic fraud-driven `ad.cancel` path |
 | Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established |
 
 ## Planned Components

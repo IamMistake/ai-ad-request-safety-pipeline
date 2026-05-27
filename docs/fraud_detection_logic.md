@@ -66,13 +66,14 @@ without reconstructing it.
 
 The current real-time prototype in `flink_service/fraud_detection.py` uses:
 
-- prompt keyword inspection
-- repeated request counts by `request_context.user_ip`
+- repeated request counts by keyed identity (`shallow_fraud.identities.ip_hash` with `user_ip` fallback)
+- repeated normalized-prompt similarity checks per keyed identity
 
 Current prototype verdict logic:
 
-- mark as `fraud` when prompt contains scam terms
-- mark as `fraud` when one IP exceeds 15 requests in the running counter
+- escalate risk when one keyed identity exceeds 15 requests in the running counter
+- escalate risk when one keyed identity repeats the same normalized prompt hash more than 3 times in 60 event-time seconds
+- escalate risk when one keyed identity exceeds 8 requests in the same 60-second event-time window
 
 ## Historical Logic In Spark
 

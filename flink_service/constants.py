@@ -11,22 +11,13 @@ except ImportError:
     FRAUD_VERDICTS_TOPIC = "fraud.verdicts"
     KAFKA_BOOTSTRAP = "localhost:9092"
 
-SCAM_KEYWORDS = [
-    "hack",
-    "bitcoin",
-    "generator",
-    "credit card",
-    "multiplier",
-    "loan",
-    "scam",
-    "earn money fast",
-    "click here",
-]
-
 IP_FRAUD_THRESHOLD = 15
 IP_WINDOW_BURST_THRESHOLD = 8
 IP_WINDOW_BURST_SCORE = 0.3
 IP_WINDOW_BURST_WINDOW_SECONDS = 60
+PROMPT_SIMILARITY_THRESHOLD = 3
+PROMPT_SIMILARITY_WINDOW_SECONDS = 60
+PROMPT_SIMILARITY_SCORE = 0.3
 REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS = 5
 FRAUD_SCORE_SUSPICIOUS_THRESHOLD = 0.5
 FRAUD_SCORE_HARD_THRESHOLD = 0.8
