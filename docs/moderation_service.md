@@ -2,7 +2,7 @@
 
 ## Status
 
-This is a planned service in the current architecture direction.
+Prototype implementation is now present in `pipeline_consumers/moderation_consumer.py`.
 
 ## Purpose
 
@@ -19,6 +19,14 @@ Fraud detection and moderation are related but not identical.
 
 Keeping moderation as a dedicated service matches the broader architecture while
 allowing both systems to evolve independently.
+
+## Current Responsibilities
+
+| Responsibility | Description |
+| --- | --- |
+| Scam prompt keyword matching | Lowercase prompt content and check for simple scam keyword presence |
+| Moderation verdict publication | Emit moderation results to `moderation.verdicts` |
+| Downstream interruption on flagged prompts | Emit `ad.cancel` when scam keywords are detected |
 
 ## Planned Responsibilities
 
@@ -61,10 +69,14 @@ The moderation service can complement fraud detection in several ways:
 
 ## Future Integration Notes
 
-The repository already references `moderation.verdicts` in the top-level README.
-That topic should be considered the planned output channel for this service.
+The repository references `moderation.verdicts` in the top-level README. The
+moderation consumer now emits to this topic directly.
 
-## Boundary
+## Current Boundary
 
-This service is planned and documented so that future AI agents can implement it
-consistently with the existing architecture rather than inventing a new one.
+The moderation implementation is intentionally simple for now:
+
+- keyword matching only
+- no punctuation normalization
+- no model-based moderation
+- no advanced prompt-injection patterns yet

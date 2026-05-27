@@ -73,7 +73,7 @@ The current codebase represents an initial version of the lifecycle above:
 | Simulator | Streams WildChat Arrow rows with GeoLite2-enriched geo context |
 | Shallow fraud layer | Redis-backed detector scaffold exists |
 | Kafka transport | Local infrastructure is present in Docker Compose |
-| Parallel downstream consumers | Ad injection and placeholder moderation workers run in parallel on the same topic while Flink also consumes the same approved events |
+| Parallel downstream consumers | Ad injection worker and moderation consumer run in parallel on the same topic while Flink also consumes the same approved events |
 | Flink processor | Real keyed fraud logic consumes `ad.injection`, emits `fraud.verdicts`, and can send `ad.cancel` |
 | Spark analytics | Current offline training logic is implemented as a prototype |
 
@@ -130,7 +130,7 @@ processing, and analytics.
 Planned flow extensions already implied by the repository documents include:
 
 - publishing fraud verdict events
-- adding moderation verdict events
+- publishing moderation verdict events
 - joining fraud and moderation results in a coordinator stage
 - exporting finalized historical logs for Spark retraining
 

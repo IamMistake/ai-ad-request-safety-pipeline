@@ -16,7 +16,7 @@ prototype stage, and what is planned next.
 | Debug consumer | Implemented for local inspection | Useful for observing local topic traffic |
 | Flink fraud processor | Implemented as current main runtime processor | Consumes `ad.injection` and `ad.cancel`, suppresses future cancelled requests, emits `fraud.verdicts`, and can publish `ad.cancel` |
 | Spark analytics and training | Implemented as batch prototype | Reads historical logs, aggregates per-IP activity, and trains a model |
-| Moderation service | Planned service | Documented architecture direction |
+| Moderation service | Prototype implementation | Keyword-based moderation consumer emits `moderation.verdicts` and `ad.cancel` for flagged prompts |
 | End-to-end orchestration | Partially connected | Current stages exist and are ready for closer integration |
 
 ## Implemented Components
@@ -32,7 +32,7 @@ prototype stage, and what is planned next.
 | Fraud-driven cancel flow test script | `scripts/test_fraud_cancel_flow.sh` |
 | Shallow Kafka consumer/forwarder | `shallow_fraud_detection/shallow_fraud_consumer.py` |
 | Ad injection placeholder consumer | `pipeline_consumers/ad_injection_consumer.py` |
-| Placeholder moderation detection consumer | `pipeline_consumers/moderation_consumer.py` |
+| Moderation detection consumer | `pipeline_consumers/moderation_consumer.py` |
 
 ## Partially Implemented Components
 
@@ -44,7 +44,7 @@ prototype stage, and what is planned next.
 | Simulator event builder | `kafka/producers/simulator_events.py` | Validates WildChat rows (conversation_id, conversation, timestamp), extracts first user turn as prompt, builds event JSON |
 | Simulator lookups | `kafka/producers/simulator_lookups.py` | Random public IP generation with GeoLite2 resolution, UA/wrapping pickers, optional_context builder |
 | Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Hashing, Redis TTL state, UA heuristics, negative keyword matching, language-country checks, shallow scoring, and nested original-request return payloads are implemented |
-| Downstream fan-out placeholders | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py` | Two independent placeholder consumers subscribe to `ad.injection`, process in parallel with distinct consumer groups, and can interrupt each other via `ad.cancel` while Flink performs the real fraud analysis |
+| Downstream fan-out consumers | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py` | Two independent consumers subscribe to `ad.injection` in parallel with distinct consumer groups; moderation now emits `moderation.verdicts` and keyword-driven `ad.cancel` while ad-injection remains a placeholder worker |
 | Flink fraud processor | `flink_service/fraud_detection.py` | Consumes `ad.injection` and `ad.cancel`, keys first by `req_id` to suppress future cancelled requests, assigns event-time watermarks from request payloads, then keys by shallow `ip_hash` with a `user_ip` fallback, uses managed Flink state for request counts, a 60-second event-time burst check, and repeated normalized-prompt hash similarity checks, emits `fraud.verdicts`, and publishes `ad.cancel` on hard fraud verdicts |
 | Scripted pipeline tests | `scripts/test_full_pipeline.sh`, `scripts/test_cancel_flow.sh`, `scripts/test_fraud_cancel_flow.sh` | Bring up infra, start the relevant consumers, publish representative events, validate expected log output, and clean up spawned processes, including a deterministic fraud-driven `ad.cancel` path |
 | Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established |
@@ -53,7 +53,6 @@ prototype stage, and what is planned next.
 
 | Component | Role |
 | --- | --- |
-| Moderation service | Prompt abuse and unsafe-content analysis |
 | Coordination between services | Combine fraud and moderation outcomes |
 | Historical export flow | Feed Spark with richer request logs |
 
@@ -76,7 +75,7 @@ prototype stage, and what is planned next.
 ## Current Development Priorities
 
 1. Align downstream consumers with the updated shallow event schema.
-2. Replace placeholder moderation and ad-injection consumers with real services.
+2. Replace the placeholder ad-injection consumer with a real service.
 3. Generate or capture historical training data.
 
 ## TODO Snapshot
