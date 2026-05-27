@@ -25,6 +25,8 @@ prototype stage, and what is planned next.
 | --- | --- |
 | Local infrastructure | `docker-compose.yml` |
 | Flink streaming fraud processor | `flink_service/fraud_detection.py` |
+| Publisher profiling enrichment stage | `flink_service/publisher_profiler.py` |
+| Flink detector utilities and feature modules | `flink_service/state_utils.py`, `flink_service/prompt_features.py`, `flink_service/verdicts.py` |
 | Spark analytics and training prototype | `spark_service/spark_training.py` |
 | Debug consumer | `test_consumer.py` |
 | Full pipeline test script | `scripts/test_full_pipeline.sh` |
@@ -45,7 +47,7 @@ prototype stage, and what is planned next.
 | Simulator lookups | `kafka/producers/simulator_lookups.py` | Random public IP generation with GeoLite2 resolution, UA/wrapping pickers, optional_context builder |
 | Shallow fraud detector | `shallow_fraud_detection/shallow_fraud_detector.py` | Hashing, Redis TTL state, UA heuristics, negative keyword matching, language-country checks, shallow scoring, and nested original-request return payloads are implemented |
 | Downstream fan-out consumers | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py` | Two independent consumers subscribe to `ad.injection` in parallel with distinct consumer groups; moderation now emits `moderation.verdicts` and keyword-driven `ad.cancel` while ad-injection remains a placeholder worker |
-| Flink fraud processor | `flink_service/fraud_detection.py` | Consumes `ad.injection` and `ad.cancel`, keys first by `req_id` to suppress future cancelled requests, assigns event-time watermarks from request payloads, then keys by shallow `ip_hash` with a `user_ip` fallback, uses managed Flink state for request counts, a 60-second event-time burst check, and repeated normalized-prompt hash similarity checks, emits `fraud.verdicts`, and publishes `ad.cancel` on hard fraud verdicts |
+| Flink fraud processor | `flink_service/fraud_detection.py` | Consumes `ad.injection` and `ad.cancel`, keys first by `req_id` to suppress future cancelled requests, assigns event-time watermarks from request payloads, then keys by shallow `ip_hash` with a `user_ip` fallback for identity behavior analysis and finally by `publisher_id` for publisher profiling, uses managed Flink `ValueState`, `ListState`, `MapState`, `ReducingState`, and `AggregatingState` for rolling metrics and behavioral signals, emits enriched `fraud.verdicts`, and publishes `ad.cancel` on hard fraud verdicts |
 | Scripted pipeline tests | `scripts/test_full_pipeline.sh`, `scripts/test_cancel_flow.sh`, `scripts/test_fraud_cancel_flow.sh` | Bring up infra, start the relevant consumers, publish representative events, validate expected log output, and clean up spawned processes, including a deterministic fraud-driven `ad.cancel` path |
 | Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established |
 

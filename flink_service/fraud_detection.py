@@ -30,6 +30,7 @@ from flink_service.events import (
     CANCEL_STREAM_KIND,
     REQUEST_STREAM_KIND,
     extract_identity_key,
+    extract_publisher_key,
     extract_event_timestamp_ms,
     extract_request_key,
     load_event,
@@ -37,6 +38,7 @@ from flink_service.events import (
     verdict_to_cancel,
     wrap_stream_event,
 )
+from flink_service.publisher_profiler import PublisherProfiler
 
 
 class RequestTimestampAssigner(TimestampAssigner):
@@ -117,14 +119,19 @@ def main() -> None:
         output_type=Types.STRING(),
     )
 
-    analyzed.sink_to(build_kafka_sink(FRAUD_VERDICTS_TOPIC))
+    profiled = analyzed.key_by(extract_publisher_key).process(
+        PublisherProfiler(),
+        output_type=Types.STRING(),
+    )
 
-    analyzed.filter(should_emit_cancel).map(
+    profiled.sink_to(build_kafka_sink(FRAUD_VERDICTS_TOPIC))
+
+    profiled.filter(should_emit_cancel).map(
         verdict_to_cancel,
         output_type=Types.STRING(),
     ).sink_to(build_kafka_sink(AD_CANCEL_TOPIC))
 
-    analyzed.print()
+    profiled.print()
 
     env.execute(FRAUD_JOB_NAME)
 
