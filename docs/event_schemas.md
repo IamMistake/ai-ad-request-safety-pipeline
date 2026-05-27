@@ -263,11 +263,36 @@ Source: `flink_service/detector.py`
   "similar_prompt_count": 4,
   "prompt_similarity_window_seconds": 60,
   "normalized_prompt_hash": "e4f9d99f212f6f17",
+  "prompt_repeat_count": 6,
+  "session_request_count": 5,
+  "country_frequency": 5,
+  "publisher_request_count_for_identity": 5,
+  "country_top": "NO",
+  "country_top_frequency": 5,
+  "unique_country_count_recent": 2,
+  "inter_request_gap_seconds": 0.81,
+  "avg_inter_request_gap_seconds": 1.22,
+  "avg_requests_per_session": 3.4,
+  "avg_fraud_score_recent": 0.58,
+  "rolling_fraud_intensity": 6.11,
+  "rolling_suspicious_count": 9,
+  "rolling_moderation_hits": 3,
   "ip_hash": "abcd1234ef567890",
   "user_ip": "158.37.13.4",
   "prompt_preview": "Write a very long, elaborate...",
   "shallow_fraud_score": 0.35,
   "shallow_fraud_flags": ["ip_burst"],
+  "publisher_profile": {
+    "publisher_rolling_fraud_count": 4,
+    "publisher_rolling_suspicious_count": 12,
+    "publisher_avg_fraud_score": 0.61,
+    "publisher_unique_identity_count": 9,
+    "publisher_dominant_country": "NO",
+    "publisher_dominant_country_count": 8,
+    "publisher_dominant_prompt_hash": "e4f9d99f212f6f17",
+    "publisher_dominant_prompt_count": 5,
+    "publisher_prompt_repetition_count": 5
+  },
   "cancel_downstream": false
 }
 ```
@@ -289,11 +314,26 @@ Source: `flink_service/detector.py`
 | `similar_prompt_count` | integer or null | Repetitions of the same normalized prompt hash in trailing window |
 | `prompt_similarity_window_seconds` | integer | Prompt-similarity window size |
 | `normalized_prompt_hash` | string | Short SHA-256 hash of normalized prompt |
+| `prompt_repeat_count` | integer | Repetitions of normalized prompt hash in keyed map state |
+| `session_request_count` | integer | Rolling request count for current session id under identity key |
+| `country_frequency` | integer | Frequency of the current country under identity key |
+| `publisher_request_count_for_identity` | integer | Frequency of current publisher under identity key |
+| `country_top` | string | Highest-frequency country for identity key |
+| `country_top_frequency` | integer | Count for highest-frequency country |
+| `unique_country_count_recent` | integer | Distinct country count in recent geo list state |
+| `inter_request_gap_seconds` | number or null | Gap to previous request timestamp for identity key |
+| `avg_inter_request_gap_seconds` | number or null | Online average inter-request gap via aggregating state |
+| `avg_requests_per_session` | number or null | Online average requests-per-session via aggregating state |
+| `avg_fraud_score_recent` | number or null | Online average fraud score via aggregating state |
+| `rolling_fraud_intensity` | number | Rolling cumulative fraud intensity via reducing state |
+| `rolling_suspicious_count` | integer | Rolling suspicious/fraud verdict count via reducing state |
+| `rolling_moderation_hits` | integer | Rolling moderation-like shallow-flag hit count via reducing state |
 | `ip_hash` | string | Identity hash from shallow detector when available |
 | `user_ip` | string | Raw IP fallback identity field |
 | `prompt_preview` | string | First 80 chars of prompt |
 | `shallow_fraud_score` | number | Shallow layer fraud score copied from input |
 | `shallow_fraud_flags` | array of strings | Shallow flags copied from input |
+| `publisher_profile` | object | Publisher-keyed profile metrics appended by second Flink stage |
 | `cancel_downstream` | boolean | Whether Flink should emit `ad.cancel` |
 
 ## 7. Moderation Verdict Event

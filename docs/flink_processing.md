@@ -5,9 +5,9 @@
 `flink_service/fraud_detection.py` is the current real-time fraud detection
 service. It consumes shallow-approved request events plus cancel signals from
 Kafka, ignores future requests whose `req_id` has already been cancelled,
-assigns event-time watermarks from request payload timestamps, applies keyed
-fraud rules plus an event-time burst check, emits verdicts, and can cancel
-downstream work for hard fraud cases.
+assigns event-time watermarks from request payload timestamps, applies identity
+keyed fraud rules with richer Flink keyed state, applies publisher keyed
+profiling, emits verdicts, and can cancel downstream work for hard fraud cases.
 
 ## Current Entry Point
 
@@ -25,10 +25,12 @@ flowchart LR
     I --> C
     C --> D[Assign event-time watermarks from event_time]
     D --> E[Key by ip_hash or user_ip]
-    E --> F[Apply keyed IP-frequency, event-time burst, and prompt-similarity rules]
-    F --> G[Produce verdict payload]
-    G --> H[fraud.verdicts]
-    G --> J[ad.cancel for fraud verdicts]
+    E --> F[Identity fraud detector with Value/List/Map/Reducing/Aggregating state]
+    F --> G[Key by publisher_id]
+    G --> K[Publisher profiler with Map/Reducing/Aggregating state]
+    K --> H[Produce enriched verdict payload]
+    H --> I[fraud.verdicts]
+    H --> J[ad.cancel for fraud verdicts]
 ```
 
 ## Current Rule Set
@@ -37,7 +39,11 @@ flowchart LR
 | --- | --- | --- |
 | IP request frequency | Flag repeated requests from the same IP identity | keyed Flink `ValueState` |
 | IP event-time burst | Flag more than 8 requests from one identity in a 60-second event-time window | keyed Flink `ListState` + request timestamps |
-| Prompt similarity burst | Flag repeated normalized prompts from one identity in a 60-second event-time window | keyed Flink `ListState` + normalized prompt hash |
+| Prompt similarity and repetition | Flag repeated normalized prompts in event-time windows and frequency maps | keyed Flink `ListState` + `MapState` |
+| Geo churn | Track country distribution and recent country shifts per identity | keyed Flink `MapState` + `ListState` |
+| Session analytics | Track per-session velocity and average requests per session | keyed Flink `MapState` + `AggregatingState` |
+| Rolling fraud metrics | Track rolling fraud intensity, suspicious totals, moderation-like hit totals | keyed Flink `ReducingState` |
+| Publisher profiling | Track publisher-level prompt/country/identity concentration and averages | second keyed stage by `publisher_id` |
 | Shallow score escalation | Upgrade already-risky requests using shallow score | `shallow_fraud.fraud_score` |
 
 ## Current Implementation Notes
@@ -53,9 +59,9 @@ The current file performs the following steps:
 7. Drops any later request event for a `req_id` that has already been cancelled.
 8. Assigns bounded out-of-orderness watermarks from `event_time` after cancel suppression.
 9. Keys surviving request events by `shallow_fraud.identities.ip_hash` with a `user_ip` fallback.
-10. Applies keyed rule-based fraud logic with managed state.
-11. Counts recent requests inside a 60-second event-time window per identity.
-12. Publishes verdict events to `fraud.verdicts`.
+10. Applies identity keyed rule-based fraud logic with managed state primitives.
+11. Re-keys identity verdicts by `publisher_id` and applies publisher profiling.
+12. Publishes enriched verdict events to `fraud.verdicts`.
 13. Publishes `ad.cancel` for hard fraud verdicts.
 
 ## Current Fraud Signals In Code
@@ -65,6 +71,9 @@ The current service scores and classifies requests using:
 - the keyed count for a specific IP identity exceeds `15`
 - more than `8` requests arrive for the same identity inside the trailing `60` event-time seconds
 - more than `3` requests from the same identity share the same normalized prompt hash inside the trailing `60` event-time seconds
+- repeated normalized prompt hashes indicate potential prompt spam campaigns
+- high country churn indicates possible geo anomaly behavior
+- rapid inter-request gaps and high session-local velocity indicate automation
 - the shallow fraud score is already elevated enough to escalate risk
 
 Current prompt normalization for similarity checks:
@@ -88,24 +97,47 @@ The job currently emits a JSON verdict payload with:
 - `similar_prompt_count`
 - `prompt_similarity_window_seconds`
 - `normalized_prompt_hash`
+- `prompt_repeat_count`
+- `session_request_count`
+- `country_frequency`
+- `publisher_request_count_for_identity`
+- `country_top`
+- `country_top_frequency`
+- `unique_country_count_recent`
+- `inter_request_gap_seconds`
+- `avg_inter_request_gap_seconds`
+- `avg_requests_per_session`
+- `avg_fraud_score_recent`
+- `rolling_fraud_intensity`
+- `rolling_suspicious_count`
+- `rolling_moderation_hits`
 - `fraud_score`
 - `reasons`
 - `ip_hash`
 - `shallow_fraud_score`
 - `shallow_fraud_flags`
+- `publisher_profile`
 - `verdict`
 
 ## Streaming Concepts In Context
 
 ### Keyed streams
 
-The current file keys the stream by `ip_hash` when present and falls back to
-`user_ip` otherwise.
+The current pipeline uses multiple keyed stages:
+
+- first by `ip_hash` when present and `user_ip` fallback for identity behavior
+- then by `publisher_id` for publisher-side profiling
 
 ### Stateful stream processing
 
-Fraud detection depends on remembering prior events. The current file uses
-managed Flink `ValueState` with TTL for per-identity request counters.
+Fraud detection depends on remembering prior events. The current implementation
+uses managed Flink keyed state with TTL including:
+
+- `ValueState` for per-identity total request counters
+- `ListState` for recent event history, geo history, prompt hashes, and recent flags
+- `MapState` for prompt/country/publisher/session/flag frequencies
+- `ReducingState` for rolling fraud and moderation-related aggregates
+- `AggregatingState` for online averages such as inter-request gap and session velocity
 
 ### Event time and watermarking
 

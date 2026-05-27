@@ -93,6 +93,14 @@ def extract_identity_key(raw_value: str) -> str:
     return "unknown"
 
 
+def extract_publisher_key(raw_value: str) -> str:
+    event = load_event(raw_value)
+    publisher_id = str(event.get("publisher_id", "")).strip()
+    if publisher_id:
+        return publisher_id
+    return "publisher:unknown"
+
+
 def should_emit_cancel(verdict_raw: str) -> bool:
     verdict = load_event(verdict_raw)
     return verdict.get("verdict") == "fraud" and bool(verdict.get("cancel_downstream", False))
