@@ -33,6 +33,7 @@ def build_identity_verdict(
     shallow_fraud_flags,
 ) -> dict:
     return {
+        "record_type": "request_verdict",
         "req_id": req_id,
         "event_time": event_time,
         "publisher_id": publisher_id,
@@ -70,4 +71,39 @@ def build_identity_verdict(
         "shallow_fraud_score": shallow_fraud_score,
         "shallow_fraud_flags": shallow_fraud_flags,
         "cancel_downstream": verdict == "fraud",
+    }
+
+
+def build_session_summary_verdict(
+    *,
+    publisher_id: str,
+    session_id: str,
+    publisher_session_key: str,
+    session_window_start: str,
+    session_window_end: str,
+    prompts_per_session: int,
+    avg_typing_gap_seconds: float | None,
+    session_duration_seconds: float,
+    prompt_entropy: float,
+    conversation_complexity: float,
+    unique_prompt_hash_count: int,
+    top_prompt_hash: str | None,
+) -> dict:
+    return {
+        "record_type": "session_summary",
+        "publisher_id": publisher_id,
+        "session_id": session_id,
+        "publisher_session_key": publisher_session_key,
+        "session_window_start": session_window_start,
+        "session_window_end": session_window_end,
+        "prompts_per_session": prompts_per_session,
+        "avg_typing_gap_seconds": None
+        if avg_typing_gap_seconds is None
+        else round(float(avg_typing_gap_seconds), 3),
+        "session_duration_seconds": round(float(session_duration_seconds), 3),
+        "prompt_entropy": round(float(prompt_entropy), 3),
+        "conversation_complexity": round(float(conversation_complexity), 3),
+        "unique_prompt_hash_count": unique_prompt_hash_count,
+        "top_prompt_hash": top_prompt_hash,
+        "cancel_downstream": False,
     }

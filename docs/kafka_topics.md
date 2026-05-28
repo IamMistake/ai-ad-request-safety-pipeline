@@ -38,7 +38,7 @@ following fields:
 | `optional_context.asn` | Network-level feature for analytics |
 | `publisher_id` | Traffic source identifier for analytics |
 | `shallow_fraud.identities.ip_hash` | Stable keyed identity for Flink state |
-| `shallow_fraud.fraud_score` | Shallow-stage score reused during stream scoring |
+| `shallow_fraud.fraud_score` | Shallow-stage score forwarded as context metadata for Flink output |
 | `fraud_verdict` | Historical label used in batch training |
 
 ## Consumer Groups

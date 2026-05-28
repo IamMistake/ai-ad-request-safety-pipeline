@@ -28,9 +28,13 @@ flowchart LR
     E --> F[Identity fraud detector with Value/List/Map/Reducing/Aggregating state]
     F --> G[Key by publisher_id]
     G --> K[Publisher profiler with Map/Reducing/Aggregating state]
-    K --> H[Produce enriched verdict payload]
+    K --> H[Produce enriched request verdict payload]
     H --> I[fraud.verdicts]
     H --> J[ad.cancel for fraud verdicts]
+    D --> L[Key by publisher_id+session_id]
+    L --> M[Session feature tracker with ListState+AggregatingState]
+    M --> N[Event-time session window summaries]
+    N --> I
 ```
 
 ## Current Rule Set
@@ -44,7 +48,7 @@ flowchart LR
 | Session analytics | Track per-session velocity and average requests per session | keyed Flink `MapState` + `AggregatingState` |
 | Rolling fraud metrics | Track rolling fraud intensity, suspicious totals, moderation-like hit totals | keyed Flink `ReducingState` |
 | Publisher profiling | Track publisher-level prompt/country/identity concentration and averages | second keyed stage by `publisher_id` |
-| Shallow score escalation | Upgrade already-risky requests using shallow score | `shallow_fraud.fraud_score` |
+| Shallow context passthrough | Preserve shallow score/flags as metadata for downstream analysis | `shallow_fraud.fraud_score`, `shallow_fraud.flags` |
 
 ## Current Implementation Notes
 
@@ -61,8 +65,9 @@ The current file performs the following steps:
 9. Keys surviving request events by `shallow_fraud.identities.ip_hash` with a `user_ip` fallback.
 10. Applies identity keyed rule-based fraud logic with managed state primitives.
 11. Re-keys identity verdicts by `publisher_id` and applies publisher profiling.
-12. Publishes enriched verdict events to `fraud.verdicts`.
-13. Publishes `ad.cancel` for hard fraud verdicts.
+12. In parallel, keys watermarked request events by `publisher_id|session_id`, tracks real-time session features, and emits session-window summaries.
+13. Publishes both request verdict and session summary records to `fraud.verdicts`.
+14. Publishes `ad.cancel` for hard fraud request verdicts.
 
 ## Current Fraud Signals In Code
 
@@ -74,7 +79,7 @@ The current service scores and classifies requests using:
 - repeated normalized prompt hashes indicate potential prompt spam campaigns
 - high country churn indicates possible geo anomaly behavior
 - rapid inter-request gaps and high session-local velocity indicate automation
-- the shallow fraud score is already elevated enough to escalate risk
+- shallow score and flags are forwarded as context only and do not contribute to Flink fraud scoring
 
 Current prompt normalization for similarity checks:
 
@@ -118,6 +123,20 @@ The job currently emits a JSON verdict payload with:
 - `shallow_fraud_flags`
 - `publisher_profile`
 - `verdict`
+
+It also emits session summary records to the same topic with:
+
+- `record_type = session_summary`
+- `publisher_session_key`
+- `session_window_start`
+- `session_window_end`
+- `prompts_per_session`
+- `avg_typing_gap_seconds`
+- `session_duration_seconds`
+- `prompt_entropy`
+- `conversation_complexity`
+- `unique_prompt_hash_count`
+- `top_prompt_hash`
 
 ## Streaming Concepts In Context
 

@@ -101,6 +101,16 @@ def extract_publisher_key(raw_value: str) -> str:
     return "publisher:unknown"
 
 
+def extract_publisher_session_key(raw_value: str) -> str:
+    event = load_event(raw_value)
+    publisher_id = str(event.get("publisher_id", "")).strip() or "publisher:unknown"
+    request_context = event.get("request_context")
+    if not isinstance(request_context, dict):
+        request_context = {}
+    session_id = str(request_context.get("session_id", "")).strip() or "session:unknown"
+    return f"{publisher_id}|{session_id}"
+
+
 def should_emit_cancel(verdict_raw: str) -> bool:
     verdict = load_event(verdict_raw)
     return verdict.get("verdict") == "fraud" and bool(verdict.get("cancel_downstream", False))

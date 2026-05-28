@@ -26,3 +26,4 @@ CANCELLED_REQ_TTL_MINUTES = 120
 FRAUD_CONSUMER_GROUP = "flink-fraud-consumer"
 FRAUD_JOB_NAME = "Flink Fraud Detection"
 FRAUD_CANCELLED_BY = "fraud-detection"
+SESSION_WINDOW_GAP_SECONDS = 180
