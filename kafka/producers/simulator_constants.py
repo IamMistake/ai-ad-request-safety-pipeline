@@ -4,6 +4,9 @@ KAFKA_BOOTSTRAP = "localhost:9092"
 KAFKA_TOPIC = "shallow-fraud-detection"
 DEFAULT_RATE_PER_SEC = 0.2
 
+NORMAL_TRAFFIC_SESSION_RATIO = 0.9
+NORMAL_LANGUAGE_COUNTRY_MATCH_RATIO = 0.95
+
 DATASET_PATH = Path("datasets/WildChat/train/")
 GEOIP_CITY_PATH = Path("datasets/geo/GeoLite2-City.mmdb")
 
@@ -57,6 +60,41 @@ USER_AGENTS = [
 ]
 
 GENDERS = ["female", "male"]
+
+ENGLISH_FALLBACK_COUNTRIES = ["US", "GB", "CA", "AU", "IN", "SG"]
+GLOBAL_COUNTRY_POOL = [
+    "US",
+    "GB",
+    "CA",
+    "AU",
+    "IN",
+    "SG",
+    "CN",
+    "TW",
+    "JP",
+    "KR",
+    "FR",
+    "DE",
+    "ES",
+    "MX",
+    "BR",
+    "AR",
+    "IT",
+    "NL",
+    "SE",
+    "NO",
+    "DK",
+    "FI",
+    "PL",
+    "RO",
+    "TR",
+    "ID",
+    "MY",
+    "TH",
+    "VN",
+    "AE",
+    "SA",
+]
 
 REQUIRED_SOURCE_FIELDS = [
     "conversation_id",

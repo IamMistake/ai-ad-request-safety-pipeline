@@ -63,6 +63,7 @@ Source: `kafka/producers/simulator_events.py`
 | `optional_context.asn` | integer | Synthetic ASN/network signal |
 | `optional_context.age` | integer | Synthetic demographic feature |
 | `optional_context.gender` | string | Synthetic demographic feature |
+| `optional_context.traffic_type` | string | Simulator session label: `normal` or `fraud` |
 | `publisher_id` | string | Traffic source identifier |
 
 ## 2. Shallow Fraud Detection Result

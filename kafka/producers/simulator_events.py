@@ -4,10 +4,12 @@ from typing import Any
 from simulator_constants import REQUIRED_SOURCE_FIELDS
 from simulator_lookups import (
     build_optional_context,
-    random_ip_with_geo,
     random_user_agent,
     random_wrapping_type,
+    session_ip_with_geo,
 )
+
+
 def validate_row(row: dict[str, Any]) -> bool:
     for key in REQUIRED_SOURCE_FIELDS:
         if key not in row or row[key] is None:
@@ -28,7 +30,9 @@ def build_request_event(row: dict[str, Any]) -> dict[str, Any]:
     language = str(row.get("language", ""))
     publisher_id = str(row.get("publisher_id", conversation_id))
 
-    ip_addr, geo = random_ip_with_geo()
+    ip_addr, geo, traffic_type = session_ip_with_geo(conversation_id, language)
+    optional_context = build_optional_context(geo)
+    optional_context["traffic_type"] = traffic_type
 
     return {
         "event_time": event_time,
@@ -43,6 +47,6 @@ def build_request_event(row: dict[str, Any]) -> dict[str, Any]:
         "request_configuration": {
             "wrapping_type": random_wrapping_type(),
         },
-        "optional_context": build_optional_context(geo),
+        "optional_context": optional_context,
         "publisher_id": publisher_id,
     }
