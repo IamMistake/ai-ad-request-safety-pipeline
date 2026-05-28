@@ -5,7 +5,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from pyflink.common import Duration, Types
+from pyflink.common import Duration, Time, Types
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.watermark_strategy import TimestampAssigner, WatermarkStrategy
 from pyflink.datastream import StreamExecutionEnvironment
@@ -24,6 +24,7 @@ from flink_service.constants import (
     FRAUD_VERDICTS_TOPIC,
     KAFKA_BOOTSTRAP,
     REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
+    SESSION_WINDOW_GAP_SECONDS,
 )
 from flink_service.detector import FraudDetector
 from flink_service.events import (
@@ -31,6 +32,7 @@ from flink_service.events import (
     REQUEST_STREAM_KIND,
     extract_identity_key,
     extract_publisher_key,
+    extract_publisher_session_key,
     extract_event_timestamp_ms,
     extract_request_key,
     load_event,
@@ -39,6 +41,12 @@ from flink_service.events import (
     wrap_stream_event,
 )
 from flink_service.publisher_profiler import PublisherProfiler
+from flink_service.session_analytics import (
+    SessionFeatureTracker,
+    SessionMetricsAggregateFunction,
+    SessionMetricsWindowFunction,
+)
+from pyflink.datastream.window import EventTimeSessionWindows
 
 
 class RequestTimestampAssigner(TimestampAssigner):
@@ -124,14 +132,31 @@ def main() -> None:
         output_type=Types.STRING(),
     )
 
-    profiled.sink_to(build_kafka_sink(FRAUD_VERDICTS_TOPIC))
+    session_enriched = watermarked_requests.key_by(extract_publisher_session_key).process(
+        SessionFeatureTracker(),
+        output_type=Types.STRING(),
+    )
+
+    session_summaries = (
+        session_enriched.key_by(extract_publisher_session_key)
+        .window(EventTimeSessionWindows.with_gap(Time.seconds(SESSION_WINDOW_GAP_SECONDS)))
+        .aggregate(
+            SessionMetricsAggregateFunction(),
+            SessionMetricsWindowFunction(),
+            output_type=Types.STRING(),
+        )
+    )
+
+    verdict_stream = profiled.union(session_summaries)
+
+    verdict_stream.sink_to(build_kafka_sink(FRAUD_VERDICTS_TOPIC))
 
     profiled.filter(should_emit_cancel).map(
         verdict_to_cancel,
         output_type=Types.STRING(),
     ).sink_to(build_kafka_sink(AD_CANCEL_TOPIC))
 
-    profiled.print()
+    verdict_stream.print()
 
     env.execute(FRAUD_JOB_NAME)
 

@@ -73,6 +73,7 @@ Source: `shallow_fraud_detection/shallow_fraud_detector.py`
 
 ```json
 {
+  "record_type": "request_verdict",
   "req_id": "5e87cd8f53dff5e7...",
   "fraud_score": 0.35,
   "flags": ["ip_burst"],
@@ -301,6 +302,7 @@ Source: `flink_service/detector.py`
 
 | Field | Type | Meaning |
 | --- | --- | --- |
+| `record_type` | string | Event subtype in `fraud.verdicts`; `request_verdict` for per-request detections |
 | `req_id` | string or null | Request identifier |
 | `event_time` | string | Request timestamp passed through from input |
 | `publisher_id` | string | Request publisher/source identifier |
@@ -336,7 +338,52 @@ Source: `flink_service/detector.py`
 | `publisher_profile` | object | Publisher-keyed profile metrics appended by second Flink stage |
 | `cancel_downstream` | boolean | Whether Flink should emit `ad.cancel` |
 
-## 7. Moderation Verdict Event
+## 7. Session Summary Verdict Event
+
+This is an additional JSON shape emitted by Flink to `fraud.verdicts` from the
+event-time session window branch.
+
+Sources: `flink_service/session_analytics.py`, `flink_service/verdicts.py`
+
+```json
+{
+  "record_type": "session_summary",
+  "publisher_id": "conversation-id",
+  "session_id": "conversation-id",
+  "publisher_session_key": "conversation-id|conversation-id",
+  "session_window_start": "2023-04-10T00:01:00+00:00",
+  "session_window_end": "2023-04-10T00:04:00+00:00",
+  "prompts_per_session": 7,
+  "avg_typing_gap_seconds": 18.4,
+  "session_duration_seconds": 124.0,
+  "prompt_entropy": 1.73,
+  "conversation_complexity": 0.64,
+  "unique_prompt_hash_count": 5,
+  "top_prompt_hash": "e4f9d99f212f6f17",
+  "cancel_downstream": false
+}
+```
+
+### Session Summary Fields
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `record_type` | string | Event subtype in `fraud.verdicts`; `session_summary` |
+| `publisher_id` | string | Request publisher/source identifier |
+| `session_id` | string | Session identifier from `request_context.session_id` |
+| `publisher_session_key` | string | Composite key: `publisher_id|session_id` |
+| `session_window_start` | string | Session window start time in ISO format |
+| `session_window_end` | string | Session window end time in ISO format |
+| `prompts_per_session` | integer | Number of prompt events in the session window |
+| `avg_typing_gap_seconds` | number or null | Average inter-prompt time delta from event timestamps |
+| `session_duration_seconds` | number | Session duration using first and last event timestamps |
+| `prompt_entropy` | number | Shannon entropy over normalized prompt-hash frequencies |
+| `conversation_complexity` | number | Composite complexity score derived from session behavior |
+| `unique_prompt_hash_count` | integer | Distinct normalized prompt hashes in session window |
+| `top_prompt_hash` | string or null | Most frequent normalized prompt hash in session window |
+| `cancel_downstream` | boolean | Always `false` for session summaries |
+
+## 8. Moderation Verdict Event
 
 This is the JSON emitted by moderation consumer to `moderation.verdicts`.
 
@@ -375,7 +422,7 @@ request simulator
   -> shallow-fraud-detection
   -> shallow fraud detector result
   -> ad.injection (allowed requests with shallow_fraud block)
-  -> fraud.verdicts
+  -> fraud.verdicts (request_verdict + session_summary)
   -> moderation.verdicts
   -> ad.cancel (from fraud and moderation detections)
 ```

@@ -12,7 +12,6 @@ from pyflink.datastream.state import (
 
 from flink_service.constants import (
     FRAUD_SCORE_HARD_THRESHOLD,
-    FRAUD_SCORE_SUSPICIOUS_THRESHOLD,
     IP_FRAUD_THRESHOLD,
     PROMPT_SIMILARITY_SCORE,
     PROMPT_SIMILARITY_THRESHOLD,
@@ -39,6 +38,7 @@ from flink_service.state_utils import (
     unique_count,
 )
 from flink_service.verdicts import build_identity_verdict
+
 
 class FraudDetector(KeyedProcessFunction):
     def __init__(self) -> None:
@@ -67,33 +67,49 @@ class FraudDetector(KeyedProcessFunction):
         state_descriptor.enable_time_to_live(ttl_config)
         self.ip_count_state = runtime_context.get_state(state_descriptor)
 
-        recent_timestamps_descriptor = ListStateDescriptor("recent_event_timestamps", Types.LONG())
+        recent_timestamps_descriptor = ListStateDescriptor(
+            "recent_event_timestamps", Types.LONG()
+        )
         recent_timestamps_descriptor.enable_time_to_live(ttl_config)
-        self.recent_event_timestamps_state = runtime_context.get_list_state(recent_timestamps_descriptor)
+        self.recent_event_timestamps_state = runtime_context.get_list_state(
+            recent_timestamps_descriptor
+        )
 
-        recent_prompts_descriptor = ListStateDescriptor("recent_prompt_occurrences", Types.STRING())
+        recent_prompts_descriptor = ListStateDescriptor(
+            "recent_prompt_occurrences", Types.STRING()
+        )
         recent_prompts_descriptor.enable_time_to_live(ttl_config)
-        self.recent_prompt_occurrences_state = runtime_context.get_list_state(recent_prompts_descriptor)
+        self.recent_prompt_occurrences_state = runtime_context.get_list_state(
+            recent_prompts_descriptor
+        )
 
         prompt_frequency_descriptor = MapStateDescriptor(
             "prompt_frequency_map", Types.STRING(), Types.INT()
         )
         prompt_frequency_descriptor.enable_time_to_live(ttl_config)
-        self.prompt_frequency_state = runtime_context.get_map_state(prompt_frequency_descriptor)
+        self.prompt_frequency_state = runtime_context.get_map_state(
+            prompt_frequency_descriptor
+        )
 
         country_frequency_descriptor = MapStateDescriptor(
             "country_frequency_map", Types.STRING(), Types.INT()
         )
         country_frequency_descriptor.enable_time_to_live(ttl_config)
-        self.country_frequency_state = runtime_context.get_map_state(country_frequency_descriptor)
+        self.country_frequency_state = runtime_context.get_map_state(
+            country_frequency_descriptor
+        )
 
         publisher_metrics_descriptor = MapStateDescriptor(
             "publisher_metrics_map", Types.STRING(), Types.INT()
         )
         publisher_metrics_descriptor.enable_time_to_live(ttl_config)
-        self.publisher_metrics_state = runtime_context.get_map_state(publisher_metrics_descriptor)
+        self.publisher_metrics_state = runtime_context.get_map_state(
+            publisher_metrics_descriptor
+        )
 
-        flag_metrics_descriptor = MapStateDescriptor("flag_metrics_map", Types.STRING(), Types.INT())
+        flag_metrics_descriptor = MapStateDescriptor(
+            "flag_metrics_map", Types.STRING(), Types.INT()
+        )
         flag_metrics_descriptor.enable_time_to_live(ttl_config)
         self.flag_metrics_state = runtime_context.get_map_state(flag_metrics_descriptor)
 
@@ -101,49 +117,71 @@ class FraudDetector(KeyedProcessFunction):
             "session_metrics_map", Types.STRING(), Types.INT()
         )
         session_metrics_descriptor.enable_time_to_live(ttl_config)
-        self.session_metrics_state = runtime_context.get_map_state(session_metrics_descriptor)
+        self.session_metrics_state = runtime_context.get_map_state(
+            session_metrics_descriptor
+        )
 
-        recent_geo_descriptor = ListStateDescriptor("recent_geo_history", Types.STRING())
+        recent_geo_descriptor = ListStateDescriptor(
+            "recent_geo_history", Types.STRING()
+        )
         recent_geo_descriptor.enable_time_to_live(ttl_config)
-        self.recent_geo_history_state = runtime_context.get_list_state(recent_geo_descriptor)
+        self.recent_geo_history_state = runtime_context.get_list_state(
+            recent_geo_descriptor
+        )
 
         recent_flags_descriptor = ListStateDescriptor("recent_flags", Types.STRING())
         recent_flags_descriptor.enable_time_to_live(ttl_config)
-        self.recent_flags_state = runtime_context.get_list_state(recent_flags_descriptor)
+        self.recent_flags_state = runtime_context.get_list_state(
+            recent_flags_descriptor
+        )
 
-        recent_prompt_hashes_descriptor = ListStateDescriptor("recent_prompt_hashes", Types.STRING())
+        recent_prompt_hashes_descriptor = ListStateDescriptor(
+            "recent_prompt_hashes", Types.STRING()
+        )
         recent_prompt_hashes_descriptor.enable_time_to_live(ttl_config)
-        self.recent_prompt_hashes_state = runtime_context.get_list_state(recent_prompt_hashes_descriptor)
+        self.recent_prompt_hashes_state = runtime_context.get_list_state(
+            recent_prompt_hashes_descriptor
+        )
 
         recent_session_timestamps_descriptor = ListStateDescriptor(
             "recent_session_timestamps", Types.STRING()
         )
         recent_session_timestamps_descriptor.enable_time_to_live(ttl_config)
-        self.recent_session_timestamps_state = runtime_context.get_list_state(recent_session_timestamps_descriptor)
+        self.recent_session_timestamps_state = runtime_context.get_list_state(
+            recent_session_timestamps_descriptor
+        )
 
         fraud_intensity_descriptor = ReducingStateDescriptor(
             "rolling_fraud_intensity", sum_float, Types.FLOAT()
         )
         fraud_intensity_descriptor.enable_time_to_live(ttl_config)
-        self.rolling_fraud_intensity_state = runtime_context.get_reducing_state(fraud_intensity_descriptor)
+        self.rolling_fraud_intensity_state = runtime_context.get_reducing_state(
+            fraud_intensity_descriptor
+        )
 
         suspicious_count_descriptor = ReducingStateDescriptor(
             "rolling_suspicious_count", sum_float, Types.FLOAT()
         )
         suspicious_count_descriptor.enable_time_to_live(ttl_config)
-        self.rolling_suspicious_count_state = runtime_context.get_reducing_state(suspicious_count_descriptor)
+        self.rolling_suspicious_count_state = runtime_context.get_reducing_state(
+            suspicious_count_descriptor
+        )
 
         moderation_hits_descriptor = ReducingStateDescriptor(
             "rolling_moderation_hits", sum_float, Types.FLOAT()
         )
         moderation_hits_descriptor.enable_time_to_live(ttl_config)
-        self.rolling_moderation_hits_state = runtime_context.get_reducing_state(moderation_hits_descriptor)
+        self.rolling_moderation_hits_state = runtime_context.get_reducing_state(
+            moderation_hits_descriptor
+        )
 
         avg_inter_gap_descriptor = AggregatingStateDescriptor(
             "avg_inter_request_gap", RunningAverage(), Types.PICKLED_BYTE_ARRAY()
         )
         avg_inter_gap_descriptor.enable_time_to_live(ttl_config)
-        self.avg_inter_request_gap_state = runtime_context.get_aggregating_state(avg_inter_gap_descriptor)
+        self.avg_inter_request_gap_state = runtime_context.get_aggregating_state(
+            avg_inter_gap_descriptor
+        )
 
         avg_requests_per_session_descriptor = AggregatingStateDescriptor(
             "avg_requests_per_session", RunningAverage(), Types.PICKLED_BYTE_ARRAY()
@@ -157,7 +195,9 @@ class FraudDetector(KeyedProcessFunction):
             "avg_fraud_score", RunningAverage(), Types.PICKLED_BYTE_ARRAY()
         )
         avg_fraud_score_descriptor.enable_time_to_live(ttl_config)
-        self.avg_fraud_score_state = runtime_context.get_aggregating_state(avg_fraud_score_descriptor)
+        self.avg_fraud_score_state = runtime_context.get_aggregating_state(
+            avg_fraud_score_descriptor
+        )
 
     def process_element(self, value: str, ctx: "KeyedProcessFunction.Context"):
         event = load_event(value)
@@ -209,18 +249,27 @@ class FraudDetector(KeyedProcessFunction):
         current_count += 1
         self.ip_count_state.update(current_count)
 
-        prompt_repeat_count = increment_map_counter(self.prompt_frequency_state, normalized_prompt_hash)
+        prompt_repeat_count = increment_map_counter(
+            self.prompt_frequency_state, normalized_prompt_hash
+        )
         country_count = increment_map_counter(self.country_frequency_state, country)
-        publisher_count = increment_map_counter(self.publisher_metrics_state, publisher_key)
+        publisher_count = increment_map_counter(
+            self.publisher_metrics_state, publisher_key
+        )
         session_count = increment_map_counter(self.session_metrics_state, session_id)
 
         window_request_count = None
         similar_prompt_count = None
         inter_request_gap_seconds = None
         if event_timestamp_ms is not None:
-            prune_before_ms = event_timestamp_ms - (
-                IP_WINDOW_BURST_WINDOW_SECONDS + REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS
-            ) * 1000
+            prune_before_ms = (
+                event_timestamp_ms
+                - (
+                    IP_WINDOW_BURST_WINDOW_SECONDS
+                    + REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS
+                )
+                * 1000
+            )
             recent_timestamps = [
                 timestamp_ms
                 for timestamp_ms in self.recent_event_timestamps_state.get()
@@ -229,16 +278,23 @@ class FraudDetector(KeyedProcessFunction):
             recent_timestamps.append(event_timestamp_ms)
             self.recent_event_timestamps_state.update(recent_timestamps)
 
-            window_start_ms = event_timestamp_ms - (IP_WINDOW_BURST_WINDOW_SECONDS * 1000)
+            window_start_ms = event_timestamp_ms - (
+                IP_WINDOW_BURST_WINDOW_SECONDS * 1000
+            )
             window_request_count = sum(
                 1
                 for timestamp_ms in recent_timestamps
                 if window_start_ms <= timestamp_ms <= event_timestamp_ms
             )
 
-            similarity_prune_before_ms = event_timestamp_ms - (
-                PROMPT_SIMILARITY_WINDOW_SECONDS + REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS
-            ) * 1000
+            similarity_prune_before_ms = (
+                event_timestamp_ms
+                - (
+                    PROMPT_SIMILARITY_WINDOW_SECONDS
+                    + REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS
+                )
+                * 1000
+            )
             recent_prompt_occurrences = [
                 (occurrence_timestamp_ms, occurrence_hash)
                 for occurrence_timestamp_ms, occurrence_hash in parse_prompt_occurrences(
@@ -247,10 +303,16 @@ class FraudDetector(KeyedProcessFunction):
                 if occurrence_timestamp_ms >= similarity_prune_before_ms
             ]
 
-            recent_prompt_occurrences.append((event_timestamp_ms, normalized_prompt_hash))
-            self.recent_prompt_occurrences_state.update(serialize_prompt_occurrences(recent_prompt_occurrences))
+            recent_prompt_occurrences.append(
+                (event_timestamp_ms, normalized_prompt_hash)
+            )
+            self.recent_prompt_occurrences_state.update(
+                serialize_prompt_occurrences(recent_prompt_occurrences)
+            )
 
-            similarity_window_start_ms = event_timestamp_ms - (PROMPT_SIMILARITY_WINDOW_SECONDS * 1000)
+            similarity_window_start_ms = event_timestamp_ms - (
+                PROMPT_SIMILARITY_WINDOW_SECONDS * 1000
+            )
             similar_prompt_count = sum(
                 1
                 for timestamp_ms, occurrence_hash in recent_prompt_occurrences
@@ -286,17 +348,23 @@ class FraudDetector(KeyedProcessFunction):
             shallow_fraud_flags = [str(shallow_fraud_flags)]
 
         reasons = []
-        score = shallow_fraud_score
+        score = 0.0
 
         if current_count > IP_FRAUD_THRESHOLD:
             reasons.append("ip_high_frequency")
             score += 0.4
 
-        if window_request_count is not None and window_request_count > IP_WINDOW_BURST_THRESHOLD:
+        if (
+            window_request_count is not None
+            and window_request_count > IP_WINDOW_BURST_THRESHOLD
+        ):
             reasons.append("ip_window_burst")
             score += IP_WINDOW_BURST_SCORE
 
-        if similar_prompt_count is not None and similar_prompt_count > PROMPT_SIMILARITY_THRESHOLD:
+        if (
+            similar_prompt_count is not None
+            and similar_prompt_count > PROMPT_SIMILARITY_THRESHOLD
+        ):
             reasons.append("prompt_similarity_burst")
             score += PROMPT_SIMILARITY_SCORE
 
@@ -304,7 +372,7 @@ class FraudDetector(KeyedProcessFunction):
             reasons.append("prompt_repetition_campaign")
             score += 0.2
 
-        if inter_request_gap_seconds is not None and inter_request_gap_seconds < 1.0:
+        if inter_request_gap_seconds is not None and inter_request_gap_seconds < 0.0001:
             reasons.append("rapid_inter_request_gap")
             score += 0.15
 
@@ -317,10 +385,6 @@ class FraudDetector(KeyedProcessFunction):
         if unique_country_count >= 4:
             reasons.append("geo_country_churn")
             score += 0.15
-
-        if shallow_fraud_score >= FRAUD_SCORE_SUSPICIOUS_THRESHOLD:
-            reasons.append("shallow_score_escalation")
-            score += 0.2
 
         for flag in shallow_fraud_flags:
             increment_map_counter(self.flag_metrics_state, str(flag))
@@ -337,8 +401,6 @@ class FraudDetector(KeyedProcessFunction):
         )
         if moderation_like_hits > 0:
             self.rolling_moderation_hits_state.add(float(moderation_like_hits))
-            reasons.append("moderation_signal_repeat")
-            score += 0.05
 
         score = round(min(score, 1.0), 3)
 
