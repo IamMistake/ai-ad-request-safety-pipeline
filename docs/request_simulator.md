@@ -27,9 +27,8 @@ The simulator now reads a transformed **WildChat** dataset (Arrow IPC format)
 where each row already contains a single user prompt. The transformed dataset is
 generated from the backed-up conversation-level source by expanding user turns
 and assigning cumulative random `1-120s` timestamp offsets within each original
-conversation. The simulator then enriches each prompt row with a random public
-IP resolved through **GeoLite2-City** for geo context and publishes JSON events
-to Kafka.
+conversation. The simulator then enriches each prompt row with session-stable
+geo context and publishes JSON events to Kafka.
 
 ## Why The Simulator Matters
 
@@ -95,7 +94,8 @@ The simulator emits request events with the following shape:
     "city": "Bergen",
     "asn": 64512,
     "age": 29,
-    "gender": "female"
+    "gender": "female",
+    "traffic_type": "normal"
   },
   "publisher_id": "publisher_01"
 }
@@ -111,12 +111,13 @@ The simulator emits request events with the following shape:
 | `language` | WildChat `language` column |
 | `request_context.session_id` | Transformed dataset `conversation_id` |
 | `request_context.user_agent` | Random pick from the 29-entry `USER_AGENTS` list |
-| `request_context.user_ip` | Random public IPv4 resolved through GeoLite2-City |
+| `request_context.user_ip` | Session-stable public IPv4 selected to match chosen country when possible |
 | `request_configuration.wrapping_type` | Random pick from `["json", "txt", "xml"]` |
-| `optional_context.country/region/city` | GeoLite2-City lookup of the random IP |
+| `optional_context.country/region/city` | Country-first session profile resolved through GeoLite2-City |
 | `optional_context.asn` | Synthetic random `int` in `[1000, 65000]` |
 | `optional_context.age` | Synthetic random `int` in `[18, 70]` |
 | `optional_context.gender` | Random pick from `["female", "male"]` |
+| `optional_context.traffic_type` | Session label: `normal` or `fraud` |
 | `publisher_id` | Transformed dataset `publisher_id` from a deterministic weighted 10-publisher pool |
 
 ## Data Source Comparison
@@ -134,10 +135,12 @@ The simulator emits request events with the following shape:
 
 ### IP and geo
 
-1. Generate a random public IPv4 (excluding private, loopback, multicast ranges).
-2. Resolve it through the GeoLite2-City MMDB.
-3. If resolution fails (8% of random IPs), retry up to 50 times.
-4. Fallback: `8.8.8.8` with country `US`.
+1. Build a deterministic session profile per `conversation_id`.
+2. Assign session type (default: 90% `normal`, 10% `fraud`).
+3. Select a target country from language-aware country pools.
+4. For normal sessions, keep language-country mostly aligned (default 95%).
+5. For fraud sessions, force language-country mismatch.
+6. Sample an IP that resolves to the target country via GeoLite2 and reuse it for the full session.
 
 ### User agents
 
