@@ -392,13 +392,50 @@ Source: `pipeline_consumers/moderation_consumer.py`
 
 ```json
 {
+  "record_type": "moderation_verdict",
   "req_id": "5e87cd8f53dff5e7...",
   "event_time": "2023-04-10T00:01:08+00:00",
   "publisher_id": "conversation-id",
+  "session_id": "conversation-id",
+  "ip_hash": "abcd1234ef567890",
   "verdict": "flagged",
-  "reasons": ["scam_keyword"],
-  "matched_keywords": ["bitcoin", "click here"],
+  "reasons": ["category:scam", "signal:phishing_url"],
+  "moderation_flags": ["category:scam", "signal:phishing_url"],
+  "moderation_score": 0.76,
+  "matched_categories": ["PHISHING", "SCAM", "SPAM"],
+  "category_matches": {
+    "PHISHING": ["verify account"],
+    "SCAM": ["bitcoin generator"],
+    "SPAM": ["click here"]
+  },
+  "matched_keywords": ["verify account", "bitcoin generator", "click here"],
+  "total_keyword_hits": 3,
+  "behavioral_signals": {
+    "identity_key": "publisher_01|session-123|abcd1234ef567890",
+    "recent_hit_count": 3,
+    "window_seconds": 300.0,
+    "repeated_hit_threshold": 3,
+    "repeated_moderation_hits": true
+  },
+  "normalization_diagnostics": {
+    "normalized_preview": "verify account and use bitcoin generator click here",
+    "unicode_changed": false,
+    "leetspeak_changed": false,
+    "punctuation_removed": true,
+    "punctuation_removed_count": 3,
+    "whitespace_collapsed": true,
+    "raw_length": 58,
+    "normalized_length": 52,
+    "excessive_punctuation": false,
+    "excessive_punctuation_runs": [],
+    "repeated_characters": false,
+    "repeated_character_sequences": [],
+    "unicode_obfuscation": false,
+    "non_ascii_count": 0,
+    "url_like_matches": ["bit.ly"]
+  },
   "prompt_preview": "Write a very long, elaborate...",
+  "normalized_prompt_preview": "write a very long elaborate...",
   "cancel_downstream": true
 }
 ```
@@ -407,13 +444,24 @@ Source: `pipeline_consumers/moderation_consumer.py`
 
 | Field | Type | Meaning |
 | --- | --- | --- |
+| `record_type` | string | Event subtype in `moderation.verdicts`; currently `moderation_verdict` |
 | `req_id` | string or null | Request identifier |
 | `event_time` | string | Request timestamp passed through from input |
 | `publisher_id` | string | Request publisher/source identifier |
+| `session_id` | string or null | Session identifier from `request_context.session_id` |
+| `ip_hash` | string or null | Shallow identity hash when present on the forwarded event |
 | `verdict` | string | `clean` or `flagged` |
-| `reasons` | array of strings | Triggered moderation rule names |
-| `matched_keywords` | array of strings | Keywords that matched prompt content |
+| `reasons` | array of strings | Triggered moderation rule and heuristic labels |
+| `moderation_flags` | array of strings | Duplicate of `reasons` for moderation-oriented consumers |
+| `moderation_score` | number | Rounded moderation severity score in `[0.0, 1.0]` |
+| `matched_categories` | array of strings | Matched moderation categories |
+| `category_matches` | object | Per-category matched keywords |
+| `matched_keywords` | array of strings | Flattened matched keywords across all categories |
+| `total_keyword_hits` | integer | Total number of Aho-Corasick pattern hits before per-category dedupe |
+| `behavioral_signals` | object | Rolling per-identity moderation hit counters maintained by the consumer |
+| `normalization_diagnostics` | object | Prompt normalization metadata and heuristic signal diagnostics |
 | `prompt_preview` | string | First 80 chars of prompt |
+| `normalized_prompt_preview` | string | First 80 chars of normalized prompt text |
 | `cancel_downstream` | boolean | Whether moderation emitted `ad.cancel` |
 
 ## Current Topic Flow

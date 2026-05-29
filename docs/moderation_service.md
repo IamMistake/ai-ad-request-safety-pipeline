@@ -24,9 +24,12 @@ allowing both systems to evolve independently.
 
 | Responsibility | Description |
 | --- | --- |
-| Scam prompt keyword matching | Lowercase prompt content and check for simple scam keyword presence |
-| Moderation verdict publication | Emit moderation results to `moderation.verdicts` |
-| Downstream interruption on flagged prompts | Emit `ad.cancel` when scam keywords are detected |
+| Prompt normalization | Lowercase, Unicode-normalize, de-punctuate, collapse whitespace, and normalize simple leetspeak before matching |
+| Category-based matching | Run one-pass Aho-Corasick matching over normalized prompts for `SCAM`, `JAILBREAK`, `PROMPT_INJECTION`, `SPAM`, `PHISHING`, and `NSFW` keywords |
+| Lightweight heuristics | Detect excessive punctuation, repeated characters, Unicode obfuscation, and URL-like phishing indicators |
+| Behavioral moderation analytics | Track repeated moderation hits per publisher/session/identity key inside the stream consumer |
+| Moderation verdict publication | Emit rich moderation results to `moderation.verdicts` |
+| Downstream interruption on flagged prompts | Emit `ad.cancel` when severe or repeated moderation hits are detected |
 
 ## Planned Responsibilities
 
@@ -50,14 +53,21 @@ flowchart LR
 
 ## Potential Moderation Signals
 
-Examples of patterns this service may eventually inspect:
+Examples of patterns the current lightweight pipeline now inspects or is designed to extend:
 
 - scam-style vocabulary
+- jailbreak phrases
+- prompt-injection attempts
+- phishing account-verification patterns
 - spam repetition
 - policy bypass phrases
 - prompt injection markers
 - advertiser favoritism attempts
 - suspicious formatting templates repeated at scale
+- excessive punctuation bursts
+- repeated character spam
+- Unicode-based obfuscation
+- repeated moderation hits over a short stream window
 
 ## Relationship To Fraud Decisions
 
@@ -74,9 +84,26 @@ moderation consumer now emits to this topic directly.
 
 ## Current Boundary
 
-The moderation implementation is intentionally simple for now:
+The moderation implementation remains intentionally lightweight for stream use:
 
-- keyword matching only
-- no punctuation normalization
+- no LLMs, transformers, embeddings, or external moderation APIs
+- pure Python normalization and Aho-Corasick-style matching only
+- in-consumer rolling behavior state rather than a dedicated Flink moderation job
 - no model-based moderation
-- no advanced prompt-injection patterns yet
+- no advanced semantic understanding beyond rules and heuristics
+
+## Current Output Shape
+
+The moderation consumer now emits:
+
+- moderation flags
+- matched categories and keywords
+- moderation score
+- normalization diagnostics
+- behavioral hit counters
+- downstream cancel intent
+
+## Implementation Plan
+
+The detailed rollout plan for this moderation pipeline now lives in
+`docs/moderation_pipeline_plan.md`.
