@@ -53,6 +53,7 @@ Consumer groups are a key streaming concept for this project.
 | fraud-processing groups | Scale real-time fraud processors horizontally |
 | moderation groups | Scale planned moderation processors independently |
 | analytics export groups | Capture historical logs for Spark input |
+| `spark-historical-exporter` | Consume request and verdict streams to build Spark JSONL training logs |
 
 ## Streaming Concepts To Preserve
 
@@ -90,6 +91,7 @@ flowchart LR
 - The ad injection consumer, moderation consumer, and Flink fraud processor each use distinct consumer groups so they all receive the same request in parallel.
 - Each downstream consumer also listens to `ad.cancel` and can stop in-flight work when another consumer emits a matching cancel message.
 - The canonical Flink fraud job consumes `ad.injection` and `ad.cancel`, emits `fraud.verdicts`, and can emit `ad.cancel`.
+- `spark_service/historical_exporter.py` consumes `ad.injection`, `fraud.verdicts`, `moderation.verdicts`, and `ad.cancel` to append joined records into `spark_service/data/request_logs.json`.
 - If Flink has already observed an `ad.cancel` for a `req_id`, later `ad.injection` events for that same `req_id` are dropped before fraud scoring.
 - Topic standardization should be handled as a continuation of the current
   architecture, not as a redesign.
