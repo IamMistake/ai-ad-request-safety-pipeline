@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -57,6 +58,38 @@ class RequestTimestampAssigner(TimestampAssigner):
         return event_timestamp_ms
 
 
+def format_verdict_log_line(raw_value: str) -> str:
+    verdict = load_event(raw_value)
+    if "_parse_error" in verdict:
+        return f"[flink-fraud] ERROR parse={verdict['_parse_error']}"
+
+    record_type = str(verdict.get("record_type", "")).strip()
+    if record_type == "session_summary":
+        return ""
+
+    if record_type != "request_verdict":
+        return f"[flink-fraud] UNKNOWN record_type={record_type or 'missing'}"
+
+    req_id = str(verdict.get("req_id", "")).strip() or "unknown"
+    verdict_label = str(verdict.get("verdict", "clean")).upper()
+    score = float(verdict.get("fraud_score", 0.0) or 0.0)
+    reasons = verdict.get("reasons", [])
+    if not isinstance(reasons, list):
+        reasons = [str(reasons)]
+
+    target_topics = [FRAUD_VERDICTS_TOPIC]
+    if bool(verdict.get("cancel_downstream", False)):
+        target_topics.append(AD_CANCEL_TOPIC)
+
+    if reasons:
+        return (
+            f"[flink-fraud] {verdict_label} req_id={req_id} "
+            f"score={score} reasons={json.dumps(reasons)} -> {', '.join(target_topics)}"
+        )
+
+    return f"[flink-fraud] {verdict_label} req_id={req_id} score={score} -> {', '.join(target_topics)}"
+
+
 def build_kafka_sink(topic: str) -> KafkaSink:
     return (
         KafkaSink.builder()
@@ -92,6 +125,11 @@ def main() -> None:
     env = StreamExecutionEnvironment.get_execution_environment()
     env.set_parallelism(1)
     add_connector_jars(env)
+
+    print(
+        "flink-fraud processor started: "
+        f"{AD_INJECTION_TOPIC} + {AD_CANCEL_TOPIC} -> {FRAUD_VERDICTS_TOPIC}"
+    )
 
     request_stream = env.from_source(
         build_kafka_source(AD_INJECTION_TOPIC),
@@ -156,7 +194,10 @@ def main() -> None:
         output_type=Types.STRING(),
     ).sink_to(build_kafka_sink(AD_CANCEL_TOPIC))
 
-    verdict_stream.print()
+    verdict_stream.map(
+        format_verdict_log_line,
+        output_type=Types.STRING(),
+    ).filter(lambda line: bool(line)).print()
 
     env.execute(FRAUD_JOB_NAME)
 
