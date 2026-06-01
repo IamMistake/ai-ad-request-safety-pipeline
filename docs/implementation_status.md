@@ -15,7 +15,7 @@ prototype stage, and what is planned next.
 | Shallow fraud detector | Prototype implementation | Redis-backed session and IP last-seen checks, shallow scoring, and allow/deny forwarding are implemented |
 | Debug consumer | Implemented for local inspection | Useful for observing local topic traffic |
 | Flink fraud processor | Implemented as current main runtime processor | Consumes `ad.injection` and `ad.cancel`, suppresses future cancelled requests, emits `fraud.verdicts`, and can publish `ad.cancel` |
-| Spark analytics and training | Implemented as batch prototype | Reads historical logs, aggregates per-IP activity, and trains a model |
+| Spark analytics and training | Implemented as batch prototype | Historical exporter consumes Kafka topics into JSONL logs; Spark training aggregates risk rollups and trains a model with metrics artifacts |
 | Moderation service | Prototype implementation | Rule-based moderation consumer now applies prompt normalization, leetspeak handling, Aho-Corasick category matching, and rolling behavioral hit tracking before emitting `moderation.verdicts` and `ad.cancel` |
 | End-to-end orchestration | Partially connected | Current stages exist and are ready for closer integration |
 
@@ -29,6 +29,7 @@ prototype stage, and what is planned next.
 | Flink detector utilities and feature modules | `flink_service/state_utils.py`, `flink_service/prompt_features.py`, `flink_service/verdicts.py` |
 | Flink session analytics stage | `flink_service/session_analytics.py` |
 | Spark analytics and training prototype | `spark_service/spark_training.py` |
+| Spark historical exporter | `spark_service/historical_exporter.py` |
 | Debug consumer | `test_consumer.py` |
 | Full pipeline test script | `scripts/test_full_pipeline.sh` |
 | Cancel flow test script | `scripts/test_cancel_flow.sh` |
@@ -50,7 +51,7 @@ prototype stage, and what is planned next.
 | Downstream fan-out consumers | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `pipeline_consumers/moderation_rules.py` | Two independent consumers subscribe to `ad.injection` in parallel with distinct consumer groups; moderation now performs normalized one-pass category matching for `SCAM`, `JAILBREAK`, `PROMPT_INJECTION`, `SPAM`, `PHISHING`, and `NSFW`, emits rich moderation verdicts, and raises `ad.cancel` for severe or repeated hits while ad-injection remains a placeholder worker |
 | Flink fraud processor | `flink_service/fraud_detection.py` | Consumes `ad.injection` and `ad.cancel`, keys first by `req_id` to suppress future cancelled requests, assigns event-time watermarks from request payloads, then keys by shallow `ip_hash` with a `user_ip` fallback for identity behavior analysis and by `publisher_id` for publisher profiling, and in parallel keys by `publisher_id|session_id` for event-time session summaries; uses managed Flink `ValueState`, `ListState`, `MapState`, `ReducingState`, and `AggregatingState` for rolling metrics and behavioral signals; starts real-time Flink fraud scoring at `0.0` (shallow score/flags are passthrough context only); emits both real-time request verdicts and session summary records to `fraud.verdicts`; publishes `ad.cancel` on hard fraud request verdicts |
 | Scripted pipeline tests | `scripts/test_full_pipeline.sh`, `scripts/test_cancel_flow.sh`, `scripts/test_fraud_cancel_flow.sh` | Bring up infra, start the relevant consumers, publish representative events, validate expected log output, and clean up spawned processes, including a deterministic fraud-driven `ad.cancel` path |
-| Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established |
+| Historical dataset path | `spark_service/data/request_logs.json` | Batch input location is established and filled by `spark_service/historical_exporter.py` |
 
 ## Planned Components
 
@@ -79,7 +80,7 @@ prototype stage, and what is planned next.
 
 1. Align downstream consumers with the updated shallow event schema.
 2. Replace the placeholder ad-injection consumer with a real service.
-3. Generate or capture historical training data.
+3. Grow historical training data volume and labeling coverage.
 
 ## TODO Snapshot
 

@@ -2,9 +2,10 @@
 
 ## Purpose
 
-`spark_service/spark_training.py` provides the batch analytics side of the
-system. It is responsible for processing historical request logs, deriving
-aggregate risk signals, and training an offline fraud model.
+`spark_service/historical_exporter.py` and `spark_service/spark_training.py`
+provide the batch analytics side of the system. Together they are responsible
+for building historical request logs from Kafka topics, deriving aggregate risk
+signals, and training an offline fraud model.
 
 ## Why Spark Exists In This Architecture
 
@@ -12,41 +13,50 @@ Real-time systems are optimized for fast decisions. Fraud programs also need a
 historical layer that can look across larger datasets, compute long-horizon
 patterns, and retrain models. Spark fills that role in the current design.
 
-## Current Entry Point
+## Current Entry Points
 
-- File: `spark_service/spark_training.py`
+- Exporter: `spark_service/historical_exporter.py`
+- Trainer: `spark_service/spark_training.py`
 - Input path: `spark_service/data/request_logs.json`
 - Output paths:
   - `spark_service/output/ip_risk_scores.json`
+  - `spark_service/output/publisher_risk_scores.json`
+  - `spark_service/output/asn_risk_scores.json`
+  - `spark_service/output/session_risk_scores.json`
   - `spark_service/output/fraud_model.pkl`
+  - `spark_service/output/model_metrics.json`
+  - `spark_service/output/feature_columns.json`
 
 ## Current Processing Flow
 
 ```mermaid
 flowchart LR
-    A[Historical request_logs.json] --> B[Load with Spark]
-    B --> C[Feature engineering]
-    C --> D[Aggregate per-IP request statistics]
-    C --> E[Convert selected features to Pandas]
-    E --> F[Train RandomForestClassifier]
-    D --> G[Write IP risk scores]
-    F --> H[Write fraud_model.pkl]
+    A[Kafka topics ad.injection + fraud.verdicts + moderation.verdicts + ad.cancel] --> B[historical_exporter.py]
+    B --> C[Historical request_logs.json]
+    C --> D[Load with Spark]
+    D --> E[Feature engineering]
+    E --> F[Aggregate risk statistics]
+    E --> G[Convert selected features to Pandas]
+    G --> H[Train RandomForestClassifier]
+    F --> I[Write risk score outputs]
+    H --> J[Write model + metrics artifacts]
 ```
 
 ## Current Implemented Steps
 
-The batch job currently:
+The batch pipeline currently:
 
-1. Starts a local Spark session.
-2. Loads request logs from JSON.
-3. Lowercases prompt text.
-4. Extracts scam-keyword matches with a regex.
-5. Builds a label from `fraud_verdict == "fraud"`.
-6. Aggregates request counts by `request_context.user_ip`.
-7. Writes per-IP aggregate output.
-8. Converts selected features to Pandas.
-9. Trains a `RandomForestClassifier`.
-10. Saves the trained model as a pickle file.
+1. Consumes Kafka events and builds joined historical rows by `req_id`.
+2. Appends JSONL training rows to `spark_service/data/request_logs.json`.
+3. Starts a local Spark session.
+4. Loads historical logs from JSONL.
+5. Normalizes request and verdict fields into a training dataframe.
+6. Lowercases prompt text and extracts scam-keyword matches with a regex.
+7. Builds labels from exported `final_label` values.
+8. Aggregates per-IP, per-publisher, per-ASN, and per-session risk statistics.
+9. Converts selected features to Pandas.
+10. Trains a `RandomForestClassifier` when dataset size and class balance are sufficient.
+11. Saves model plus training metrics artifacts.
 
 ## Current Features In Use
 
@@ -55,7 +65,8 @@ The batch job currently:
 | `contains_scam` | Whether prompt text matches known suspicious phrases |
 | `asn` | Autonomous System Number as a network-level signal (from `optional_context.asn`) |
 | `publisher_id` | Traffic source identifier, useful for future modeling |
-| `label` | Fraud label derived from historical verdicts |
+| `shallow_fraud_score` | Prior shallow-stage risk score used as a model feature |
+| `label` | Fraud label derived from historical combined verdicts (`final_label`) |
 
 ## Current Role In The Larger System
 
@@ -78,9 +89,8 @@ patterns in fraud detection platforms.
 
 ## Current Dataset Note
 
-The file `spark_service/data/request_logs.json` currently exists as the initial
-dataset location for batch training. It serves as the expected handoff point for
-future log export and synthetic-data workflows.
+The file `spark_service/data/request_logs.json` is the dataset handoff point for
+batch training and is now populated by `spark_service/historical_exporter.py`.
 
 ## Future Analytics Directions
 

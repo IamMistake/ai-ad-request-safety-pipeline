@@ -11,6 +11,7 @@ pipelines for analysis/training.
 - Debug consumer: `test_consumer.py`
 - Flink streaming fraud processor: `flink_service/fraud_detection.py`
 - Spark training example + sample data: `spark_service/spark_training.py`
+- Spark historical exporter: `spark_service/historical_exporter.py`
 
 ## Documentation
 
@@ -69,6 +70,18 @@ python test_consumer.py
 
 ```bash
 ./scripts/test_fraud_cancel_flow.sh
+```
+
+7) Export historical logs for Spark from Kafka topics
+
+```bash
+python spark_service/historical_exporter.py --from-beginning --idle-seconds 30
+```
+
+8) Run Spark batch analytics and model training
+
+```bash
+python spark_service/spark_training.py
 ```
 
 ## Kafka topics
