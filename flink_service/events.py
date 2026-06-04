@@ -1,10 +1,8 @@
+import copy
 import json
 from datetime import datetime
 
-from flink_service.constants import FRAUD_CANCELLED_BY
-
-REQUEST_STREAM_KIND = "request"
-CANCEL_STREAM_KIND = "cancel"
+from flink_service.constants import FORWARD_SUSPICIOUS_TO_MODERATION
 
 
 def load_event(raw_value: str) -> dict:
@@ -36,50 +34,8 @@ def extract_event_timestamp_ms(event: dict) -> int | None:
     return int(parsed.timestamp() * 1000)
 
 
-def wrap_stream_event(stream_kind: str, raw_value: str) -> str:
-    return json.dumps({"stream": stream_kind, "payload": raw_value})
-
-
-def load_stream_event(raw_value: str) -> dict:
-    event = load_event(raw_value)
-    if "_parse_error" in event:
-        return event
-
-    stream_kind = str(event.get("stream", "")).strip()
-    payload_raw = event.get("payload")
-    if not isinstance(payload_raw, str):
-        return {"_parse_error": "invalid_stream_event", "_raw": raw_value}
-
-    payload = load_event(payload_raw)
-    if "_parse_error" in payload:
-        return payload
-
-    return {"stream": stream_kind, "payload_raw": payload_raw, "payload": payload}
-
-
-def extract_request_key(raw_value: str) -> str:
-    event = load_stream_event(raw_value)
-    if "_parse_error" in event:
-        return raw_value
-
-    payload = event["payload"]
-    req_id = str(payload.get("req_id", "")).strip()
-    if req_id:
-        return req_id
-
-    return f"missing:{event.get('stream', 'unknown')}:{event['payload_raw']}"
-
-
 def extract_identity_key(raw_value: str) -> str:
     event = load_event(raw_value)
-    shallow_fraud = event.get("shallow_fraud")
-    if isinstance(shallow_fraud, dict):
-        identities = shallow_fraud.get("identities")
-        if isinstance(identities, dict):
-            ip_hash = str(identities.get("ip_hash", "")).strip()
-            if ip_hash:
-                return ip_hash
-
     request_context = event.get("request_context")
     if isinstance(request_context, dict):
         user_ip = str(request_context.get("user_ip", "")).strip()
@@ -111,17 +67,31 @@ def extract_publisher_session_key(raw_value: str) -> str:
     return f"{publisher_id}|{session_id}"
 
 
-def should_emit_cancel(verdict_raw: str) -> bool:
+def should_forward_to_moderation(verdict_raw: str) -> bool:
     verdict = load_event(verdict_raw)
-    return verdict.get("verdict") == "fraud" and bool(verdict.get("cancel_downstream", False))
+    if verdict.get("record_type") != "request_verdict":
+        return False
+
+    verdict_label = str(verdict.get("verdict", "clean")).strip().lower()
+    if verdict_label == "clean":
+        return True
+    if verdict_label == "suspicious":
+        return FORWARD_SUSPICIOUS_TO_MODERATION
+    return False
 
 
-def verdict_to_cancel(verdict_raw: str) -> str:
+def verdict_to_moderation_request(verdict_raw: str) -> str:
     verdict = load_event(verdict_raw)
-    cancel_event = {
-        "req_id": verdict.get("req_id"),
-        "cancelled_by": FRAUD_CANCELLED_BY,
-        "reason": ", ".join(verdict.get("reasons", [])) or "fraud_detected",
-        "percent_finished": 100,
+    request = verdict.get("request")
+    if not isinstance(request, dict):
+        request = {}
+
+    forwarded_request = copy.deepcopy(request)
+    forwarded_request["fraud_context"] = {
+        "verdict": verdict.get("verdict"),
+        "fraud_score": verdict.get("fraud_score", 0.0),
+        "reasons": verdict.get("reasons", []),
+        "ip_hash": verdict.get("ip_hash"),
+        "ua_hash": verdict.get("ua_hash"),
     }
-    return json.dumps(cancel_event)
+    return json.dumps(forwarded_request)

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOG_DIR="/tmp/opencode/request-fraud-tests/full-pipeline"
+LOG_DIR="/tmp/opencode/request-fraud-tests/moderation-block-flow"
 
 mkdir -p "$LOG_DIR"
 
@@ -55,9 +55,9 @@ FRAUD_PID=$!
 python -u "$ROOT_DIR/pipeline_consumers/moderation_consumer.py" > "$LOG_DIR/moderation.log" 2>&1 &
 MOD_PID=$!
 
-sleep 3
+sleep 5
 
-printf 'Sending full pipeline test event...\n'
+printf 'Sending moderation block test event...\n'
 python - <<'PY'
 import json
 import os
@@ -76,29 +76,37 @@ producer = KafkaProducer(
     api_version=KAFKA_API_VERSION,
     value_serializer=lambda value: json.dumps(value).encode("utf-8"),
 )
+
 producer.send(
     REQUEST_RAW_TOPIC,
     {
-        "req_id": "script-full-pipeline",
-        "prompt": "show me laptop deals",
+        "event_time": "2023-04-10T00:40:00+00:00",
+        "req_id": "script-moderation-block",
+        "prompt": "click here for a bitcoin generator limited time offer",
         "language": "english",
         "request_context": {
-            "session_id": "sess-script-full-pipeline",
-            "user_ip": "7.7.7.7",
+            "session_id": "sess-script-moderation-block",
+            "user_ip": "8.8.8.8",
             "user_agent": "Mozilla/5.0",
         },
         "optional_context": {
             "country": "US",
         },
+        "publisher_id": "script-moderation-block-publisher",
     },
 )
+
 producer.flush()
 producer.close()
 PY
 
-printf 'Validating logs...\n'
-wait_for_log "$LOG_DIR/fraud.log" "[flink-fraud] CLEAN req_id=script-full-pipeline"
-wait_for_log "$LOG_DIR/moderation.log" "[moderation-detection] CLEAN req_id=script-full-pipeline"
-wait_for_log "$LOG_DIR/ad_injection.log" "[ad-injection] finished req_id=script-full-pipeline"
+printf 'Validating moderation block logs...\n'
+wait_for_log "$LOG_DIR/fraud.log" "[flink-fraud] CLEAN req_id=script-moderation-block"
+wait_for_log "$LOG_DIR/moderation.log" "[moderation-detection] FLAGGED req_id=script-moderation-block"
 
-printf 'Full pipeline test passed. Logs are in %s\n' "$LOG_DIR"
+if grep -F "script-moderation-block" "$LOG_DIR/ad_injection.log" >/dev/null 2>&1; then
+  printf 'Moderation-flagged request unexpectedly reached ad injection\n' >&2
+  exit 1
+fi
+
+printf 'Moderation block flow test passed. Logs are in %s\n' "$LOG_DIR"

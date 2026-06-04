@@ -1,9 +1,10 @@
 import json
+import os
+import hashlib
 import sys
-from collections import defaultdict, deque
-from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
 from kafka import KafkaConsumer, KafkaProducer
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -12,104 +13,142 @@ if str(CURRENT_DIR) not in sys.path:
 
 try:
     from .constants import (
-        AD_CANCEL_TOPIC,
         AD_INJECTION_TOPIC,
         KAFKA_API_VERSION,
         KAFKA_BOOTSTRAP,
+        MODERATION_REQUESTS_TOPIC,
         MODERATION_VERDICTS_TOPIC,
     )
-    from .moderation_rules import ModerationAnalyzer
+    from .moderation_rules import ModerationAnalyzer, normalize_prompt_text
 except ImportError:
     from constants import (
-        AD_CANCEL_TOPIC,
         AD_INJECTION_TOPIC,
         KAFKA_API_VERSION,
         KAFKA_BOOTSTRAP,
+        MODERATION_REQUESTS_TOPIC,
         MODERATION_VERDICTS_TOPIC,
     )
-    from moderation_rules import ModerationAnalyzer
+    from moderation_rules import ModerationAnalyzer, normalize_prompt_text
 
-BEHAVIOR_WINDOW_SECONDS = 300.0
-REPEATED_HIT_THRESHOLD = 3
 PRODUCER_FLUSH_INTERVAL = 100
+ROOT_DIR = CURRENT_DIR.parent
 
 
-def parse_event_timestamp(event_time: object) -> float:
-    if isinstance(event_time, str):
-        try:
-            return datetime.fromisoformat(event_time.replace("Z", "+00:00")).timestamp()
-        except ValueError:
-            pass
-    return datetime.now(timezone.utc).timestamp()
+def load_env_file() -> None:
+    env_path = ROOT_DIR / ".env"
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
 
 
-def build_identity_key(event: dict) -> str:
-    request_context = event.get("request_context")
-    if not isinstance(request_context, dict):
-        request_context = {}
+class ModerationClient:
+    def __init__(self) -> None:
+        load_env_file()
+        self.provider = os.environ.get("MODERATION_PROVIDER", "mock").strip().lower() or "mock"
+        self.openai_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        self.openai_base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com").rstrip("/")
+        self.openai_model = os.environ.get("OPENAI_MODERATION_MODEL", "omni-moderation-latest").strip()
+        self.timeout_seconds = float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "20") or "20")
+        self.rule_analyzer = ModerationAnalyzer()
+        self.cache: dict[str, dict] = {}
 
-    shallow_fraud = event.get("shallow_fraud")
-    if not isinstance(shallow_fraud, dict):
-        shallow_fraud = {}
+    def _cache_key(self, prompt: str) -> str:
+        normalized_prompt = normalize_prompt_text(prompt)["normalized_prompt"]
+        return hashlib.sha256(normalized_prompt.encode("utf-8")).hexdigest()
 
-    identities = shallow_fraud.get("identities")
-    if not isinstance(identities, dict):
-        identities = {}
+    def analyze(self, prompt: str) -> dict:
+        cache_key = self._cache_key(prompt)
+        cached = self.cache.get(cache_key)
+        if cached is not None:
+            return {**cached, "cache_hit": True}
 
-    publisher_id = str(event.get("publisher_id", "")).strip() or "publisher:unknown"
-    session_id = str(request_context.get("session_id", "")).strip() or "session:unknown"
-    ip_identity = str(identities.get("ip_hash", "")).strip() or str(request_context.get("user_ip", "")).strip() or "ip:unknown"
-    return f"{publisher_id}|{session_id}|{ip_identity}"
+        if self.provider == "openai":
+            analysis = self._analyze_with_openai(prompt)
+        else:
+            analysis = self._analyze_with_mock(prompt)
 
+        self.cache[cache_key] = analysis
+        return {**analysis, "cache_hit": False}
 
-class ModerationBehaviorTracker:
-    def __init__(self, window_seconds: float, repeated_hit_threshold: int) -> None:
-        self.window_seconds = window_seconds
-        self.repeated_hit_threshold = repeated_hit_threshold
-        self.hit_history: dict[str, deque[float]] = defaultdict(deque)
-
-    def evaluate(self, identity_key: str, event_time: float, had_hit: bool) -> dict:
-        history = self.hit_history[identity_key]
-        cutoff = event_time - self.window_seconds
-        while history and history[0] < cutoff:
-            history.popleft()
-
-        if had_hit:
-            history.append(event_time)
-
-        recent_hit_count = len(history)
-        repeated_moderation_hits = recent_hit_count >= self.repeated_hit_threshold
+    def _analyze_with_mock(self, prompt: str) -> dict:
+        analysis = self.rule_analyzer.analyze(prompt)
         return {
-            "identity_key": identity_key,
-            "recent_hit_count": recent_hit_count,
-            "window_seconds": self.window_seconds,
-            "repeated_hit_threshold": self.repeated_hit_threshold,
-            "repeated_moderation_hits": repeated_moderation_hits,
+            **analysis,
+            "provider": "mock",
+        }
+
+    def _analyze_with_openai(self, prompt: str) -> dict:
+        if not self.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY is required when MODERATION_PROVIDER=openai")
+
+        diagnostics = normalize_prompt_text(prompt)
+        response = requests.post(
+            f"{self.openai_base_url}/v1/moderations",
+            headers={
+                "Authorization": f"Bearer {self.openai_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.openai_model,
+                "input": prompt,
+            },
+            timeout=self.timeout_seconds,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        results = payload.get("results") or []
+        if not results:
+            raise RuntimeError("OpenAI moderation response did not contain results")
+
+        result = results[0]
+        categories = result.get("categories") or {}
+        category_scores = result.get("category_scores") or {}
+        matched_categories = sorted(
+            category.upper().replace("/", "_")
+            for category, is_flagged in categories.items()
+            if bool(is_flagged)
+        )
+        moderation_flags = [f"category:{category.lower()}" for category in matched_categories]
+        moderation_score = 0.0
+        if category_scores:
+            moderation_score = max(float(score or 0.0) for score in category_scores.values())
+
+        return {
+            "provider": "openai",
+            "verdict": "flagged" if bool(result.get("flagged")) else "clean",
+            "moderation_score": round(min(moderation_score, 1.0), 3),
+            "moderation_flags": moderation_flags,
+            "matched_categories": matched_categories,
+            "category_matches": {category: [] for category in matched_categories},
+            "matched_keywords": [],
+            "total_keyword_hits": 0,
+            "normalization_diagnostics": diagnostics,
         }
 
 
-def build_cancel_event(req_id: str | None, analysis: dict) -> dict:
-    matched_categories = analysis.get("matched_categories", [])
-    reason = "moderation_flagged"
-    if matched_categories:
-        reason = f"moderation_flagged:{','.join(str(category).lower() for category in matched_categories)}"
-
-    return {
-        "req_id": req_id,
-        "cancelled_by": "moderation-detection",
-        "reason": reason,
-        "percent_finished": 100,
-        "matched_categories": matched_categories,
-        "matched_keywords": analysis.get("matched_keywords", []),
+def build_forwarded_request(event: dict, analysis: dict) -> dict:
+    forwarded = dict(event)
+    forwarded["moderation"] = {
+        "provider": analysis.get("provider"),
+        "verdict": analysis.get("verdict"),
         "moderation_score": analysis.get("moderation_score", 0.0),
+        "moderation_flags": analysis.get("moderation_flags", []),
+        "matched_categories": analysis.get("matched_categories", []),
+        "cache_hit": analysis.get("cache_hit", False),
     }
+    return forwarded
 
 
 def main() -> None:
-    analyzer = ModerationAnalyzer()
-    behavior_tracker = ModerationBehaviorTracker(BEHAVIOR_WINDOW_SECONDS, REPEATED_HIT_THRESHOLD)
+    client = ModerationClient()
     consumer = KafkaConsumer(
-        AD_INJECTION_TOPIC,
+        MODERATION_REQUESTS_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
         api_version=KAFKA_API_VERSION,
         auto_offset_reset="latest",
@@ -126,7 +165,7 @@ def main() -> None:
 
     print(
         "moderation-detection consumer started: "
-        f"{AD_INJECTION_TOPIC} -> {MODERATION_VERDICTS_TOPIC} (+ {AD_CANCEL_TOPIC} on flagged)"
+        f"{MODERATION_REQUESTS_TOPIC} -> {MODERATION_VERDICTS_TOPIC} -> {AD_INJECTION_TOPIC} for clean requests"
     )
 
     sent_since_flush = 0
@@ -137,31 +176,17 @@ def main() -> None:
                 event = msg.value
                 req_id = str(event.get("req_id", "")).strip() or None
                 prompt = str(event.get("prompt", ""))
-                analysis = analyzer.analyze(prompt)
-                behavior = behavior_tracker.evaluate(
-                    build_identity_key(event),
-                    parse_event_timestamp(event.get("event_time")),
-                    had_hit=analysis["verdict"] == "flagged",
-                )
-
-                moderation_flags = list(analysis["moderation_flags"])
-                moderation_score = float(analysis["moderation_score"])
-                if behavior["repeated_moderation_hits"]:
-                    moderation_flags.append("behavior:repeated_moderation_hits")
-                    moderation_score = round(min(moderation_score + 0.2, 1.0), 3)
-
-                cancel_downstream = bool(analysis["cancel_downstream"] or behavior["repeated_moderation_hits"])
-                verdict = "flagged" if moderation_flags else "clean"
+                analysis = client.analyze(prompt)
+                moderation_flags = list(analysis.get("moderation_flags", []))
+                moderation_score = float(analysis.get("moderation_score", 0.0) or 0.0)
+                verdict = str(analysis.get("verdict", "clean"))
                 request_context = event.get("request_context")
                 if not isinstance(request_context, dict):
                     request_context = {}
 
-                shallow_fraud = event.get("shallow_fraud")
-                if not isinstance(shallow_fraud, dict):
-                    shallow_fraud = {}
-                identities = shallow_fraud.get("identities")
-                if not isinstance(identities, dict):
-                    identities = {}
+                fraud_context = event.get("fraud_context")
+                if not isinstance(fraud_context, dict):
+                    fraud_context = {}
 
                 verdict_event = {
                     "record_type": "moderation_verdict",
@@ -169,45 +194,36 @@ def main() -> None:
                     "event_time": event.get("event_time"),
                     "publisher_id": event.get("publisher_id"),
                     "session_id": request_context.get("session_id"),
-                    "ip_hash": identities.get("ip_hash"),
+                    "ip_hash": fraud_context.get("ip_hash"),
                     "verdict": verdict,
                     "reasons": moderation_flags,
                     "moderation_flags": moderation_flags,
                     "moderation_score": moderation_score,
-                    "matched_categories": analysis["matched_categories"],
-                    "category_matches": analysis["category_matches"],
-                    "matched_keywords": analysis["matched_keywords"],
-                    "total_keyword_hits": analysis["total_keyword_hits"],
-                    "behavioral_signals": behavior,
+                    "matched_categories": analysis.get("matched_categories", []),
+                    "category_matches": analysis.get("category_matches", {}),
+                    "matched_keywords": analysis.get("matched_keywords", []),
+                    "total_keyword_hits": analysis.get("total_keyword_hits", 0),
                     "normalization_diagnostics": analysis["normalization_diagnostics"],
                     "prompt_preview": prompt[:80],
                     "normalized_prompt_preview": analysis["normalization_diagnostics"]["normalized_preview"][:80],
-                    "cancel_downstream": cancel_downstream,
+                    "provider": analysis.get("provider", client.provider),
+                    "cache_hit": bool(analysis.get("cache_hit", False)),
                 }
 
                 producer.send(MODERATION_VERDICTS_TOPIC, verdict_event)
                 sent_since_flush += 1
 
-                if cancel_downstream:
-                    cancel_event = build_cancel_event(
-                        req_id,
-                        {
-                            **analysis,
-                            "matched_categories": analysis["matched_categories"],
-                            "matched_keywords": analysis["matched_keywords"],
-                            "moderation_score": moderation_score,
-                        },
-                    )
-                    producer.send(AD_CANCEL_TOPIC, cancel_event)
+                if verdict == "clean":
+                    producer.send(AD_INJECTION_TOPIC, build_forwarded_request(event, analysis))
                     sent_since_flush += 1
                     print(
-                        f"[moderation-detection] FLAGGED req_id={req_id} "
-                        f"categories={analysis['matched_categories']} score={moderation_score} "
-                        f"-> {MODERATION_VERDICTS_TOPIC}, {AD_CANCEL_TOPIC}"
+                        f"[moderation-detection] CLEAN req_id={req_id} "
+                        f"provider={analysis.get('provider', client.provider)} cache_hit={analysis.get('cache_hit', False)} "
+                        f"-> {MODERATION_VERDICTS_TOPIC}, {AD_INJECTION_TOPIC}"
                     )
                 else:
                     print(
-                        f"[moderation-detection] {verdict.upper()} req_id={req_id} "
+                        f"[moderation-detection] FLAGGED req_id={req_id} "
                         f"score={moderation_score} -> {MODERATION_VERDICTS_TOPIC}"
                     )
 

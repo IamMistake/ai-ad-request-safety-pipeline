@@ -262,7 +262,6 @@ class ModerationAnalyzer:
             score += 0.15
 
         score = round(min(score, 1.0), 3)
-        should_cancel = score >= 0.55 or bool(SEVERE_CANCEL_CATEGORIES.intersection(matched_categories))
         verdict = "flagged" if matched_categories or diagnostics["excessive_punctuation"] or diagnostics["repeated_characters"] else "clean"
 
         return {
@@ -274,5 +273,4 @@ class ModerationAnalyzer:
             "matched_keywords": matched_keywords,
             "total_keyword_hits": len(raw_matches),
             "normalization_diagnostics": diagnostics,
-            "cancel_downstream": should_cancel and verdict == "flagged",
         }

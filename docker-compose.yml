@@ -60,25 +60,3 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9093
-
-  # --------------------------------------------------
-  # REDIS
-  # --------------------------------------------------
-  redis:
-    image: redis:7.2
-    container_name: shallow_fraud_detection
-    ports:
-      - "6379:6379"
-
-  # --------------------------------------------------
-  # REDIS COMMANDER UI
-  # --------------------------------------------------
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: shallow_fraud_detection-commander
-    depends_on:
-      - redis
-    environment:
-      REDIS_HOSTS: local:shallow_fraud_detection:6379
-    ports:
-      - "8081:8081"

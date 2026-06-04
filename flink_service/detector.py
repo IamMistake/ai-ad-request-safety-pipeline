@@ -1,4 +1,6 @@
 import json
+import hashlib
+import re
 
 from pyflink.common import Types
 from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
@@ -19,7 +21,16 @@ from flink_service.constants import (
     IP_WINDOW_BURST_SCORE,
     IP_WINDOW_BURST_THRESHOLD,
     IP_WINDOW_BURST_WINDOW_SECONDS,
+    DESKTOP_IP_REPEAT_SECONDS,
+    INVALID_UA_PENALTY,
+    IP_REPEAT_PENALTY,
+    LANGUAGE_MISMATCH_PENALTY,
+    MAX_SESSION_FREQ,
+    MOBILE_IP_REPEAT_SECONDS,
+    NEGATIVE_KEYWORD_PENALTY,
     REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
+    SESSION_BURST_PENALTY,
+    SUSPICIOUS_UA_PENALTY,
 )
 from flink_service.events import extract_event_timestamp_ms, load_event
 from flink_service.prompt_features import (
@@ -38,9 +49,91 @@ from flink_service.state_utils import (
     unique_count,
 )
 from flink_service.verdicts import build_identity_verdict
+from shared.language_profiles import LANGUAGE_ALIASES, LANGUAGE_COUNTRIES
+
+NEGATIVE_KEYWORD_PATTERN = re.compile(
+    r"\b(wtf|wth|ffs|omfg|shit(ty|tiest)?|dumbass|horrible|awful|"
+    r"piss(ed|ing)? off|piece of (shit|crap|junk)|what the (fuck|hell)|"
+    r"fucking? (broken|useless|terrible|awful|horrible)|fuck you|"
+    r"screw (this|you)|so frustrating|this sucks|damn it)\b"
+)
+
+SUSPICIOUS_UA_MARKERS = (
+    "curl",
+    "python",
+    "wget",
+    "postmanruntime",
+    "bot",
+    "spider",
+    "crawler",
+    "httpclient",
+    "java/",
+)
+
+VALID_UA_MARKERS = (
+    "mozilla/5.0",
+    "applewebkit",
+    "chrome/",
+    "firefox/",
+    "safari/",
+    "edg/",
+    "mobile/",
+    "curl/",
+    "python-urllib/",
+    "wget/",
+    "postmanruntime/",
+    "googlebot/",
+    "bingbot/",
+)
 
 
 class FraudDetector(KeyedProcessFunction):
+    @staticmethod
+    def _hash(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _is_mobile_or_tablet(user_agent: str) -> bool:
+        lower_ua = user_agent.lower()
+        return any(marker in lower_ua for marker in ("iphone", "ipad", "android", "mobile", "tablet"))
+
+    @staticmethod
+    def _is_suspicious_user_agent(user_agent: str) -> bool:
+        lower_ua = user_agent.lower()
+        return any(marker in lower_ua for marker in SUSPICIOUS_UA_MARKERS)
+
+    @staticmethod
+    def _is_user_agent_ok(user_agent: str) -> bool:
+        lower_ua = user_agent.strip().lower()
+        if lower_ua in {"", "unknown_ua"}:
+            return False
+        return any(marker in lower_ua for marker in VALID_UA_MARKERS)
+
+    @staticmethod
+    def _matches_negative_keyword(prompt: str) -> bool:
+        return bool(NEGATIVE_KEYWORD_PATTERN.search(prompt.lower()))
+
+    @staticmethod
+    def _normalise_language(language: str) -> str:
+        lower_language = language.strip().lower()
+        return LANGUAGE_ALIASES.get(lower_language, lower_language)
+
+    def _is_language_spoken_in_country(self, language: str, country: str) -> bool:
+        normalised_language = self._normalise_language(language)
+        normalised_country = country.strip().upper()
+
+        if normalised_language in {"", "unknown"} or normalised_country == "":
+            return True
+
+        if normalised_language == "english":
+            return True
+
+        allowed_countries = LANGUAGE_COUNTRIES.get(normalised_language)
+        if allowed_countries is None:
+            return True
+
+        return normalised_country in allowed_countries
+
     def __init__(self) -> None:
         self.ip_count_state = None
         self.recent_event_timestamps_state = None
@@ -209,13 +302,13 @@ class FraudDetector(KeyedProcessFunction):
                     "fraud_score": 0.0,
                     "reasons": [event["_parse_error"]],
                     "prompt_preview": "",
-                    "cancel_downstream": False,
                 }
             )
             return
 
         req_id = str(event.get("req_id", "")).strip() or None
         prompt = str(event.get("prompt", ""))
+        language = str(event.get("language", ""))
         normalized_prompt = normalize_prompt(prompt)
         normalized_prompt_hash = prompt_hash(normalized_prompt)
         event_time = event.get("event_time")
@@ -224,14 +317,6 @@ class FraudDetector(KeyedProcessFunction):
         request_context = event.get("request_context")
         if not isinstance(request_context, dict):
             request_context = {}
-
-        shallow_fraud = event.get("shallow_fraud")
-        if not isinstance(shallow_fraud, dict):
-            shallow_fraud = {}
-
-        identities = shallow_fraud.get("identities")
-        if not isinstance(identities, dict):
-            identities = {}
 
         event_timestamp_ms = extract_event_timestamp_ms(event)
 
@@ -242,6 +327,10 @@ class FraudDetector(KeyedProcessFunction):
 
         session_id = str(request_context.get("session_id", "")).strip() or "unknown"
         publisher_key = str(publisher_id or "").strip() or "unknown"
+        user_agent = str(request_context.get("user_agent", "unknown_ua"))
+        user_ip = str(request_context.get("user_ip", "unknown_ip"))
+        ip_hash = self._hash(user_ip)
+        ua_hash = self._hash(user_agent)
 
         current_count = self.ip_count_state.value()
         if current_count is None:
@@ -342,13 +431,35 @@ class FraudDetector(KeyedProcessFunction):
             recent_session_timestamps = bounded(recent_session_timestamps)
             self.recent_session_timestamps_state.update(recent_session_timestamps)
 
-        shallow_fraud_score = float(shallow_fraud.get("fraud_score", 0.0) or 0.0)
-        shallow_fraud_flags = shallow_fraud.get("flags", [])
-        if not isinstance(shallow_fraud_flags, list):
-            shallow_fraud_flags = [str(shallow_fraud_flags)]
-
         reasons = []
         score = 0.0
+
+        repeat_threshold = (
+            MOBILE_IP_REPEAT_SECONDS if self._is_mobile_or_tablet(user_agent) else DESKTOP_IP_REPEAT_SECONDS
+        )
+        if inter_request_gap_seconds is not None and inter_request_gap_seconds <= repeat_threshold:
+            reasons.append("ip_repeat")
+            score += IP_REPEAT_PENALTY
+
+        if self._is_suspicious_user_agent(user_agent):
+            reasons.append("suspicious_ua")
+            score += SUSPICIOUS_UA_PENALTY
+
+        if session_count > MAX_SESSION_FREQ:
+            reasons.append("session_burst")
+            score += SESSION_BURST_PENALTY
+
+        if self._matches_negative_keyword(prompt):
+            reasons.append("negative_keyword")
+            score += NEGATIVE_KEYWORD_PENALTY
+
+        if not self._is_language_spoken_in_country(language, country):
+            reasons.append("language_country_mismatch")
+            score += LANGUAGE_MISMATCH_PENALTY
+
+        if not self._is_user_agent_ok(user_agent):
+            reasons.append("ua_invalid")
+            score += INVALID_UA_PENALTY
 
         if current_count > IP_FRAUD_THRESHOLD:
             reasons.append("ip_high_frequency")
@@ -386,18 +497,18 @@ class FraudDetector(KeyedProcessFunction):
             reasons.append("geo_country_churn")
             score += 0.15
 
-        for flag in shallow_fraud_flags:
-            increment_map_counter(self.flag_metrics_state, str(flag))
+        for reason in reasons:
+            increment_map_counter(self.flag_metrics_state, str(reason))
 
         recent_flags = list(self.recent_flags_state.get())
-        recent_flags.extend([str(flag) for flag in shallow_fraud_flags])
+        recent_flags.extend([str(reason) for reason in reasons])
         recent_flags = bounded(recent_flags)
         self.recent_flags_state.update(recent_flags)
 
         moderation_like_hits = sum(
             1
-            for flag in shallow_fraud_flags
-            if flag in {"negative_keyword", "language_country_mismatch"}
+            for reason in reasons
+            if reason in {"negative_keyword", "language_country_mismatch"}
         )
         if moderation_like_hits > 0:
             self.rolling_moderation_hits_state.add(float(moderation_like_hits))
@@ -435,11 +546,9 @@ class FraudDetector(KeyedProcessFunction):
         avg_requests_per_session = self.avg_requests_per_session_state.get()
         avg_fraud_score = self.avg_fraud_score_state.get()
 
-        ip_hash = str(identities.get("ip_hash", "")).strip()
-        user_ip = str(request_context.get("user_ip", "")).strip()
-
         yield json.dumps(
             build_identity_verdict(
+                request=event,
                 req_id=req_id,
                 event_time=event_time,
                 publisher_id=publisher_id,
@@ -467,9 +576,8 @@ class FraudDetector(KeyedProcessFunction):
                 rolling_suspicious_count=rolling_suspicious_count,
                 rolling_moderation_hits=rolling_moderation_hits,
                 ip_hash=ip_hash,
+                ua_hash=ua_hash,
                 user_ip=user_ip,
                 prompt=prompt,
-                shallow_fraud_score=shallow_fraud_score,
-                shallow_fraud_flags=shallow_fraud_flags,
             )
         )

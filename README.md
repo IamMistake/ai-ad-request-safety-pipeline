@@ -1,15 +1,17 @@
 # Request Fraud and Moderation Detection
 
-This project simulates ad request traffic, runs shallow fraud checks with Redis,
-and streams data through Kafka. It also includes example Flink and Spark
-pipelines for analysis/training.
+This project simulates ad request traffic, streams it through Kafka, runs
+real-time fraud detection in Flink, then runs moderation before approved
+requests reach ad injection. It also includes Spark historical export and model
+training prototypes.
 
 ## What's inside
 
 - Kafka request simulator: `kafka/producers/request_simulator.py`
-- Shallow fraud detector (Redis-backed): `shallow_fraud_detection/shallow_fraud_detector.py`
 - Debug consumer: `test_consumer.py`
 - Flink streaming fraud processor: `flink_service/fraud_detection.py`
+- Moderation consumer: `pipeline_consumers/moderation_consumer.py`
+- Ad injection placeholder consumer: `pipeline_consumers/ad_injection_consumer.py`
 - Spark training example + sample data: `spark_service/spark_training.py`
 - Spark historical exporter: `spark_service/historical_exporter.py`
 
@@ -28,57 +30,59 @@ The persistent technical documentation for this project lives under `docs/`.
 
 ## Quick start
 
-1) Start Kafka + Redis
+1. Start Kafka
 
 ```bash
 docker-compose up -d
 ```
 
-2) Install Python deps
+2. Install Python deps
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3) Build the transformed simulator dataset
+3. Build the transformed simulator dataset
 
 ```bash
 python scripts/transform_wildchat_user_prompts.py
 ```
 
-4) Run the request simulator prototype
+4. Run the request simulator prototype
 
 ```bash
 python kafka/producers/request_simulator.py
 ```
 
-5) (Optional) Run the multi-topic debug consumer
+5. Run the consumers
+
+```bash
+python flink_service/fraud_detection.py
+python pipeline_consumers/moderation_consumer.py
+python pipeline_consumers/ad_injection_consumer.py
+```
+
+6. Run the debug consumer
 
 ```bash
 python test_consumer.py
 ```
 
-6) Run the scripted pipeline tests
+7. Run the scripted pipeline tests
 
 ```bash
 ./scripts/test_full_pipeline.sh
+./scripts/test_fraud_block_flow.sh
+./scripts/test_moderation_block_flow.sh
 ```
 
-```bash
-./scripts/test_cancel_flow.sh
-```
-
-```bash
-./scripts/test_fraud_cancel_flow.sh
-```
-
-7) Export historical logs for Spark from Kafka topics
+8. Export historical logs for Spark from Kafka topics
 
 ```bash
 python spark_service/historical_exporter.py --from-beginning --idle-seconds 30
 ```
 
-8) Run Spark batch analytics and model training
+9. Run Spark batch analytics and model training
 
 ```bash
 python spark_service/spark_training.py
@@ -86,15 +90,14 @@ python spark_service/spark_training.py
 
 ## Kafka topics
 
-- `ad.injection`
-- `ad.cancel`
+- `request.raw`
+- `moderation.requests`
 - `fraud.verdicts`
 - `moderation.verdicts`
-- `ad.candidate`
+- `ad.injection`
 
 ## Notes
 
-- Redis runs locally on `localhost:6379` with no auth.
 - Kafka runs on `localhost:9092`.
-- The simulator file defines the intended request-generation entry point for the
-  ingestion pipeline.
+- Moderation provider settings and secrets are read from `.env`.
+- `.env.example` shows the expected moderation configuration keys.

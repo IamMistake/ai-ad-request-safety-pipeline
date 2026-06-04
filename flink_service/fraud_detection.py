@@ -16,30 +16,25 @@ from pyflink.datastream.connectors.kafka import (
     KafkaSink,
     KafkaSource,
 )
-from flink_service.cancel_filter import CancelAwareRequestFilter
 from flink_service.constants import (
-    AD_CANCEL_TOPIC,
-    AD_INJECTION_TOPIC,
     FRAUD_CONSUMER_GROUP,
     FRAUD_JOB_NAME,
     FRAUD_VERDICTS_TOPIC,
     KAFKA_BOOTSTRAP,
+    MODERATION_REQUESTS_TOPIC,
     REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
+    REQUEST_RAW_TOPIC,
     SESSION_WINDOW_GAP_SECONDS,
 )
 from flink_service.detector import FraudDetector
 from flink_service.events import (
-    CANCEL_STREAM_KIND,
-    REQUEST_STREAM_KIND,
     extract_identity_key,
     extract_publisher_key,
     extract_publisher_session_key,
     extract_event_timestamp_ms,
-    extract_request_key,
     load_event,
-    should_emit_cancel,
-    verdict_to_cancel,
-    wrap_stream_event,
+    should_forward_to_moderation,
+    verdict_to_moderation_request,
 )
 from flink_service.publisher_profiler import PublisherProfiler
 from flink_service.session_analytics import (
@@ -78,8 +73,8 @@ def format_verdict_log_line(raw_value: str) -> str:
         reasons = [str(reasons)]
 
     target_topics = [FRAUD_VERDICTS_TOPIC]
-    if bool(verdict.get("cancel_downstream", False)):
-        target_topics.append(AD_CANCEL_TOPIC)
+    if bool(verdict.get("forward_to_moderation", False)):
+        target_topics.append(MODERATION_REQUESTS_TOPIC)
 
     if reasons:
         return (
@@ -128,33 +123,16 @@ def main() -> None:
 
     print(
         "flink-fraud processor started: "
-        f"{AD_INJECTION_TOPIC} + {AD_CANCEL_TOPIC} -> {FRAUD_VERDICTS_TOPIC}"
+        f"{REQUEST_RAW_TOPIC} -> {FRAUD_VERDICTS_TOPIC} (+ {MODERATION_REQUESTS_TOPIC} for approved requests)"
     )
 
     request_stream = env.from_source(
-        build_kafka_source(AD_INJECTION_TOPIC),
+        build_kafka_source(REQUEST_RAW_TOPIC),
         watermark_strategy=WatermarkStrategy.no_watermarks(),
         source_name="Flink Fraud Request Source",
-    ).map(
-        lambda raw_value: wrap_stream_event(REQUEST_STREAM_KIND, raw_value),
-        output_type=Types.STRING(),
     )
 
-    cancel_stream = env.from_source(
-        build_kafka_source(AD_CANCEL_TOPIC),
-        watermark_strategy=WatermarkStrategy.no_watermarks(),
-        source_name="Flink Fraud Cancel Source",
-    ).map(
-        lambda raw_value: wrap_stream_event(CANCEL_STREAM_KIND, raw_value),
-        output_type=Types.STRING(),
-    )
-
-    active_requests = request_stream.union(cancel_stream).key_by(extract_request_key).process(
-        CancelAwareRequestFilter(),
-        output_type=Types.STRING(),
-    )
-
-    watermarked_requests = active_requests.assign_timestamps_and_watermarks(
+    watermarked_requests = request_stream.assign_timestamps_and_watermarks(
         WatermarkStrategy.for_bounded_out_of_orderness(
             Duration.of_seconds(REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS)
         ).with_timestamp_assigner(RequestTimestampAssigner())
@@ -170,14 +148,18 @@ def main() -> None:
         output_type=Types.STRING(),
     )
 
-    session_enriched = watermarked_requests.key_by(extract_publisher_session_key).process(
+    session_enriched = watermarked_requests.key_by(
+        extract_publisher_session_key
+    ).process(
         SessionFeatureTracker(),
         output_type=Types.STRING(),
     )
 
     session_summaries = (
         session_enriched.key_by(extract_publisher_session_key)
-        .window(EventTimeSessionWindows.with_gap(Time.seconds(SESSION_WINDOW_GAP_SECONDS)))
+        .window(
+            EventTimeSessionWindows.with_gap(Time.seconds(SESSION_WINDOW_GAP_SECONDS))
+        )
         .aggregate(
             SessionMetricsAggregateFunction(),
             SessionMetricsWindowFunction(),
@@ -189,10 +171,10 @@ def main() -> None:
 
     verdict_stream.sink_to(build_kafka_sink(FRAUD_VERDICTS_TOPIC))
 
-    profiled.filter(should_emit_cancel).map(
-        verdict_to_cancel,
+    profiled.filter(should_forward_to_moderation).map(
+        verdict_to_moderation_request,
         output_type=Types.STRING(),
-    ).sink_to(build_kafka_sink(AD_CANCEL_TOPIC))
+    ).sink_to(build_kafka_sink(MODERATION_REQUESTS_TOPIC))
 
     verdict_stream.map(
         format_verdict_log_line,

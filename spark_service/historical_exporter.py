@@ -11,19 +11,20 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
 from pipeline_consumers.constants import (
-    AD_CANCEL_TOPIC,
     AD_INJECTION_TOPIC,
     FRAUD_VERDICTS_TOPIC,
     KAFKA_API_VERSION,
     KAFKA_BOOTSTRAP,
+    MODERATION_REQUESTS_TOPIC,
     MODERATION_VERDICTS_TOPIC,
+    REQUEST_RAW_TOPIC,
 )
 
 
-REQUEST_TOPIC = AD_INJECTION_TOPIC
+REQUEST_TOPIC = REQUEST_RAW_TOPIC
 FRAUD_TOPIC = FRAUD_VERDICTS_TOPIC
 MODERATION_TOPIC = MODERATION_VERDICTS_TOPIC
-CANCEL_TOPIC = AD_CANCEL_TOPIC
+APPROVED_TOPIC = AD_INJECTION_TOPIC
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -97,7 +98,7 @@ def _ensure_record(req_id: str, records_by_req_id: dict) -> dict:
             "request": None,
             "fraud_request_verdict": None,
             "moderation_verdict": None,
-            "cancel_events": [],
+            "approved_request": None,
             "fraud_verdict": None,
             "moderation_label": None,
             "final_label": None,
@@ -124,7 +125,14 @@ def _derive_labels(record: dict) -> None:
 def _is_ready_for_export(record: dict) -> bool:
     request = record.get("request")
     fraud_verdict = record.get("fraud_request_verdict")
-    return isinstance(request, dict) and isinstance(fraud_verdict, dict)
+    if not isinstance(request, dict) or not isinstance(fraud_verdict, dict):
+        return False
+
+    verdict = fraud_verdict.get("verdict")
+    if verdict == "fraud":
+        return True
+
+    return isinstance(record.get("moderation_verdict"), dict)
 
 
 def export_historical_logs(args: argparse.Namespace) -> None:
@@ -141,8 +149,9 @@ def export_historical_logs(args: argparse.Namespace) -> None:
     consumer = KafkaConsumer(
         REQUEST_TOPIC,
         FRAUD_TOPIC,
+        MODERATION_REQUESTS_TOPIC,
         MODERATION_TOPIC,
-        CANCEL_TOPIC,
+        APPROVED_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
         api_version=KAFKA_API_VERSION,
         auto_offset_reset=auto_offset_reset,
@@ -157,7 +166,7 @@ def export_historical_logs(args: argparse.Namespace) -> None:
 
     print(
         "Spark historical exporter started: "
-        f"[{REQUEST_TOPIC}, {FRAUD_TOPIC}, {MODERATION_TOPIC}, {CANCEL_TOPIC}] -> {output_path}"
+        f"[{REQUEST_TOPIC}, {FRAUD_TOPIC}, {MODERATION_REQUESTS_TOPIC}, {MODERATION_TOPIC}, {APPROVED_TOPIC}] -> {output_path}"
     )
 
     with output_path.open("a", encoding="utf-8") as out:
@@ -196,8 +205,8 @@ def export_historical_logs(args: argparse.Namespace) -> None:
                     elif msg.topic == MODERATION_TOPIC:
                         if event.get("record_type") == "moderation_verdict":
                             record["moderation_verdict"] = event
-                    elif msg.topic == CANCEL_TOPIC:
-                        record["cancel_events"].append(event)
+                    elif msg.topic == APPROVED_TOPIC:
+                        record["approved_request"] = event
 
                     _derive_labels(record)
 

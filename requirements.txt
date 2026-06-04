@@ -1,9 +1,6 @@
 # Kafka
 kafka-python==2.0.2
 
-# Redis client (for shallow fraud detector & coordination)
-redis==5.0.1
-
 faker==20.1.0
 
 python-dateutil==2.8.2
