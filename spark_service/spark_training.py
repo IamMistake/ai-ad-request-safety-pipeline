@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import avg, col, count, lower, regexp_extract, sum as spark_sum, when
+from pyspark.sql.functions import avg, col, count, lit, lower, regexp_extract, sum as spark_sum, when
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
@@ -22,6 +22,32 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _schema_has_path(schema, path_parts: list[str]) -> bool:
+    if not path_parts:
+        return True
+
+    field_name = path_parts[0]
+    field = next((candidate for candidate in schema.fields if candidate.name == field_name), None)
+    if field is None:
+        return False
+
+    if len(path_parts) == 1:
+        return True
+
+    nested_schema = getattr(field.dataType, "fields", None)
+    if nested_schema is None:
+        return False
+
+    return _schema_has_path(field.dataType, path_parts[1:])
+
+
+def _select_path_or_null(raw_df, path: str, alias_name: str):
+    path_parts = path.split(".")
+    if _schema_has_path(raw_df.schema, path_parts):
+        return col(path).alias(alias_name)
+    return lit(None).alias(alias_name)
+
+
 def build_feature_dataframe(raw_df):
     df = raw_df.select(
         col("req_id").alias("req_id"),
@@ -29,24 +55,16 @@ def build_feature_dataframe(raw_df):
         col("request.publisher_id").alias("publisher_id"),
         col("request.request_context.user_ip").alias("user_ip"),
         col("request.request_context.session_id").alias("session_id"),
-        col("request.optional_context.asn").cast("double").alias("asn"),
+        _select_path_or_null(raw_df, "request.optional_context.asn", "asn").cast("double"),
         col("request.optional_context.country").alias("country"),
-        col("request.shallow_fraud.identities.ip_hash").alias("ip_hash_from_request"),
-        col("request.shallow_fraud.fraud_score").cast("double").alias("shallow_fraud_score_request"),
-        col("request.shallow_fraud.flags").alias("shallow_fraud_flags_request"),
         col("fraud_request_verdict.ip_hash").alias("ip_hash_from_fraud"),
-        col("fraud_request_verdict.shallow_fraud_score").cast("double").alias("shallow_fraud_score_fraud"),
-        col("fraud_request_verdict.shallow_fraud_flags").alias("shallow_fraud_flags_fraud"),
+        col("fraud_request_verdict.fraud_score").cast("double").alias("fraud_score_feature"),
         col("fraud_verdict").alias("fraud_verdict"),
         col("moderation_label").alias("moderation_label"),
         col("final_label").alias("final_label"),
     )
 
-    df = df.withColumn("ip_hash", when(col("ip_hash_from_fraud").isNotNull(), col("ip_hash_from_fraud")).otherwise(col("ip_hash_from_request")))
-    df = df.withColumn(
-        "shallow_fraud_score",
-        when(col("shallow_fraud_score_fraud").isNotNull(), col("shallow_fraud_score_fraud")).otherwise(col("shallow_fraud_score_request")),
-    )
+    df = df.withColumn("ip_hash", col("ip_hash_from_fraud"))
     df = df.withColumn("prompt_lower", lower(col("prompt")))
     df = df.withColumn("contains_scam", when(regexp_extract(col("prompt_lower"), SCAM_REGEX, 0) != "", 1).otherwise(0))
     df = df.withColumn("is_fraud", when(col("final_label") == "fraud", 1).otherwise(0))
@@ -54,9 +72,9 @@ def build_feature_dataframe(raw_df):
 
 
 def write_risk_rollups(df, output_dir: Path) -> None:
-    (df.groupBy("user_ip").agg(count("*").alias("requests_from_ip"), avg("is_fraud").alias("fraud_rate"), avg("shallow_fraud_score").alias("avg_shallow_fraud_score")).write.mode("overwrite").json(str(output_dir / "ip_risk_scores.json")))
+    (df.groupBy("user_ip").agg(count("*").alias("requests_from_ip"), avg("is_fraud").alias("fraud_rate"), avg("fraud_score_feature").alias("avg_fraud_score_feature")).write.mode("overwrite").json(str(output_dir / "ip_risk_scores.json")))
 
-    (df.groupBy("publisher_id").agg(count("*").alias("requests_from_publisher"), avg("is_fraud").alias("fraud_rate"), avg("shallow_fraud_score").alias("avg_shallow_fraud_score")).write.mode("overwrite").json(str(output_dir / "publisher_risk_scores.json")))
+    (df.groupBy("publisher_id").agg(count("*").alias("requests_from_publisher"), avg("is_fraud").alias("fraud_rate"), avg("fraud_score_feature").alias("avg_fraud_score_feature")).write.mode("overwrite").json(str(output_dir / "publisher_risk_scores.json")))
 
     (df.groupBy("asn").agg(count("*").alias("requests_from_asn"), avg("is_fraud").alias("fraud_rate")).write.mode("overwrite").json(str(output_dir / "asn_risk_scores.json")))
 
@@ -64,14 +82,16 @@ def write_risk_rollups(df, output_dir: Path) -> None:
 
 
 def train_model(df, output_dir: Path, min_rows: int) -> None:
-    pandas_df = df.select("contains_scam", "asn", "shallow_fraud_score", "is_fraud").toPandas()
+    pandas_df = df.select("contains_scam", "asn", "fraud_score_feature", "is_fraud").toPandas()
     if pandas_df.empty:
         print("No rows available for ML training.")
         return
 
     pandas_df["asn"] = pd.to_numeric(pandas_df["asn"], errors="coerce")
-    pandas_df["shallow_fraud_score"] = pd.to_numeric(pandas_df["shallow_fraud_score"], errors="coerce")
-    pandas_df = pandas_df.dropna()
+    pandas_df["fraud_score_feature"] = pd.to_numeric(pandas_df["fraud_score_feature"], errors="coerce")
+    pandas_df["asn"] = pandas_df["asn"].fillna(0.0)
+    pandas_df["fraud_score_feature"] = pandas_df["fraud_score_feature"].fillna(0.0)
+    pandas_df = pandas_df.dropna(subset=["contains_scam", "is_fraud"])
 
     if len(pandas_df) < min_rows:
         print(f"Not enough rows to train model: {len(pandas_df)} < {min_rows}")
@@ -83,7 +103,7 @@ def train_model(df, output_dir: Path, min_rows: int) -> None:
         print("Model training skipped: dataset has only one class.")
         return
 
-    X = pandas_df[["contains_scam", "asn", "shallow_fraud_score"]]
+    X = pandas_df[["contains_scam", "asn", "fraud_score_feature"]]
     class_counts = y.value_counts()
     can_stratify = len(class_counts) >= 2 and int(class_counts.min()) >= 2
     split_kwargs = {"test_size": 0.2, "random_state": 42}
@@ -104,7 +124,7 @@ def train_model(df, output_dir: Path, min_rows: int) -> None:
 
     metrics = {
         "rows_used": int(len(pandas_df)),
-        "feature_columns": ["contains_scam", "asn", "shallow_fraud_score"],
+        "feature_columns": ["contains_scam", "asn", "fraud_score_feature"],
         "label_column": "is_fraud",
         "accuracy": accuracy,
         "classification_report": report,

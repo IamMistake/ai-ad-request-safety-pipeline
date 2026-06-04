@@ -1,7 +1,7 @@
 from pathlib import Path
 
 KAFKA_BOOTSTRAP = "localhost:9092"
-KAFKA_TOPIC = "shallow-fraud-detection"
+KAFKA_TOPIC = "request.raw"
 DEFAULT_RATE_PER_SEC = 0.2
 
 NORMAL_TRAFFIC_SESSION_RATIO = 0.9

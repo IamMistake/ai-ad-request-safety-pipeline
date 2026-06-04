@@ -1,5 +1,6 @@
 def build_identity_verdict(
     *,
+    request,
     req_id,
     event_time,
     publisher_id,
@@ -27,13 +28,13 @@ def build_identity_verdict(
     rolling_suspicious_count,
     rolling_moderation_hits,
     ip_hash,
+    ua_hash,
     user_ip,
     prompt,
-    shallow_fraud_score,
-    shallow_fraud_flags,
 ) -> dict:
     return {
         "record_type": "request_verdict",
+        "request": request,
         "req_id": req_id,
         "event_time": event_time,
         "publisher_id": publisher_id,
@@ -66,11 +67,10 @@ def build_identity_verdict(
         "rolling_suspicious_count": int(rolling_suspicious_count),
         "rolling_moderation_hits": int(rolling_moderation_hits),
         "ip_hash": ip_hash,
+        "ua_hash": ua_hash,
         "user_ip": user_ip,
         "prompt_preview": prompt[:80],
-        "shallow_fraud_score": shallow_fraud_score,
-        "shallow_fraud_flags": shallow_fraud_flags,
-        "cancel_downstream": verdict == "fraud",
+        "forward_to_moderation": verdict != "fraud",
     }
 
 
@@ -105,5 +105,4 @@ def build_session_summary_verdict(
         "conversation_complexity": round(float(conversation_complexity), 3),
         "unique_prompt_hash_count": unique_prompt_hash_count,
         "top_prompt_hash": top_prompt_hash,
-        "cancel_downstream": False,
     }

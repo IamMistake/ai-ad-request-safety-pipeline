@@ -5,7 +5,7 @@ from typing import Any
 
 import geoip2.database
 
-from shallow_fraud_detection.constants import LANGUAGE_ALIASES, LANGUAGE_COUNTRIES
+from shared.language_profiles import LANGUAGE_ALIASES, LANGUAGE_COUNTRIES
 from simulator_constants import (
     ENGLISH_FALLBACK_COUNTRIES,
     GEOIP_CITY_PATH,

@@ -6,13 +6,13 @@ if str(CURRENT_DIR) not in sys.path:
     sys.path.append(str(CURRENT_DIR))
 
 try:
-    from .common import run_interruptible_consumer
+    from .common import run_consumer
 except ImportError:
-    from common import run_interruptible_consumer
+    from common import run_consumer
 
 
 def main() -> None:
-    run_interruptible_consumer(
+    run_consumer(
         consumer_name="ad-injection",
         group_id="ad-injection-consumer",
         work_duration_seconds=4.0,

@@ -3,19 +3,19 @@ import json
 from kafka import KafkaConsumer
 
 from pipeline_consumers.constants import (
-    AD_CANCEL_TOPIC,
     AD_INJECTION_TOPIC,
     FRAUD_VERDICTS_TOPIC,
     KAFKA_API_VERSION,
     KAFKA_BOOTSTRAP,
+    MODERATION_REQUESTS_TOPIC,
     MODERATION_VERDICTS_TOPIC,
-    SHALLOW_FRAUD_TOPIC,
+    REQUEST_RAW_TOPIC,
 )
 
 TOPICS = [
-    SHALLOW_FRAUD_TOPIC,
+    REQUEST_RAW_TOPIC,
+    MODERATION_REQUESTS_TOPIC,
     AD_INJECTION_TOPIC,
-    AD_CANCEL_TOPIC,
     FRAUD_VERDICTS_TOPIC,
     MODERATION_VERDICTS_TOPIC,
 ]
@@ -43,12 +43,12 @@ def main():
         print(f"🧩 Message: {json.dumps(msg.value, indent=2)[:800]}")
         print("------------------------------------------\n")
 
-        if msg.topic == SHALLOW_FRAUD_TOPIC:
-            print("placeholder: received ingress request")
+        if msg.topic == REQUEST_RAW_TOPIC:
+            print("placeholder: received raw request")
+        elif msg.topic == MODERATION_REQUESTS_TOPIC:
+            print("placeholder: received fraud-approved request for moderation")
         elif msg.topic == AD_INJECTION_TOPIC:
-            print("placeholder: received fan-out request for downstream consumers")
-        elif msg.topic == AD_CANCEL_TOPIC:
-            print("placeholder: received cancel signal for downstream consumers")
+            print("placeholder: received fully approved request for ad injection")
         elif msg.topic == FRAUD_VERDICTS_TOPIC:
             print("placeholder: received fraud verdict event")
         elif msg.topic == MODERATION_VERDICTS_TOPIC:
