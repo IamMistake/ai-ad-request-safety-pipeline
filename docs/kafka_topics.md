@@ -4,29 +4,35 @@
 
 | Topic | Purpose | Current reference | Status |
 | --- | --- | --- | --- |
-| `request.raw` | Raw ingress topic for simulator output | `kafka/producers/request_simulator.py`, `test_consumer.py`, `flink_service/fraud_detection.py` | Active |
-| `moderation.requests` | Fraud-approved requests waiting for moderation | `flink_service/fraud_detection.py`, `pipeline_consumers/moderation_consumer.py`, `test_consumer.py` | Active |
-| `ad.injection` | Fully approved request topic consumed by ad injection | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `test_consumer.py` | Active |
-| `fraud.verdicts` | Fraud decisions emitted by the Flink fraud processor | `flink_service/fraud_detection.py`, `test_consumer.py` | Active |
-| `moderation.verdicts` | Prompt moderation decisions emitted by moderation consumer | `pipeline_consumers/moderation_consumer.py`, `test_consumer.py` | Active |
+| `requests.raw` | Raw ingress topic for simulator output and Flink fraud detection | `kafka/producers/request_simulator.py`, `test_consumer.py`, `flink_service/fraud_detection.py` | Active target |
+| `requests.sus` | Suspicious requests from Flink waiting for RFC model scoring | `flink_service/fraud_detection.py`, planned `scoring_service/` | Active target |
+| `requests.clean` | Fraud-clean requests ready for moderation | `flink_service/fraud_detection.py`, planned `scoring_service/`, `pipeline_consumers/moderation_consumer.py` | Active target |
+| `requests.fraud` | Blocked fraud or unsafe request events for logs and Spark | `flink_service/fraud_detection.py`, planned `scoring_service/`, `pipeline_consumers/moderation_consumer.py` | Active target |
+| `ad.injection` | Fully approved request topic consumed by ad finding | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `test_consumer.py` | Active |
 
 ## Topic Lifecycle View
 
 ```mermaid
 flowchart LR
-    A[Simulator Output] --> B[request.raw]
+    A[Simulator Output] --> B[requests.raw]
     B --> C[Flink Fraud Processor]
-    C --> D[fraud.verdicts]
-    C --> E[moderation.requests]
-    E --> F[Moderation Detection Consumer]
-    F --> G[moderation.verdicts]
-    F --> H[ad.injection]
-    H --> I[Ad Injection Consumer]
+    C --> D[requests.sus]
+    C --> E[requests.clean]
+    C --> F[requests.fraud]
+    D --> G[RFC Scoring Service]
+    G --> E
+    G --> F
+    E --> H[Moderation Detection Consumer]
+    H --> I[ad.injection]
+    H --> F
+    I --> J[Finding Ad Process]
 ```
 
 ## Implementation Notes
 
-- The simulator publishes raw events to `request.raw`.
-- Flink consumes `request.raw`, emits `fraud.verdicts`, and forwards approved requests to `moderation.requests`.
-- Moderation consumes `moderation.requests`, emits `moderation.verdicts`, and forwards only clean requests to `ad.injection`.
-- `spark_service/historical_exporter.py` consumes `request.raw`, `fraud.verdicts`, `moderation.requests`, `moderation.verdicts`, and `ad.injection`.
+- The simulator publishes raw events to `requests.raw`.
+- Flink consumes `requests.raw` and routes requests to `requests.clean`, `requests.sus`, or `requests.fraud`.
+- The RFC scoring service consumes `requests.sus` and routes requests to `requests.clean` or `requests.fraud`.
+- Moderation consumes `requests.clean` and routes requests to `ad.injection` or `requests.fraud`.
+- `requests.fraud` contains only blocked negative events from Flink, RFC scoring, or moderation.
+- Spark/export work should account for `requests.raw`, `requests.sus`, `requests.clean`, `requests.fraud`, and `ad.injection`.

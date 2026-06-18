@@ -8,10 +8,10 @@ try:
     )
 except ImportError:
     AD_INJECTION_TOPIC = "ad.injection"
-    FRAUD_VERDICTS_TOPIC = "fraud.verdicts"
+    FRAUD_VERDICTS_TOPIC = "requests.fraud"
     KAFKA_BOOTSTRAP = "localhost:9092"
-    MODERATION_REQUESTS_TOPIC = "moderation.requests"
-    REQUEST_RAW_TOPIC = "request.raw"
+    MODERATION_REQUESTS_TOPIC = "requests.clean"
+    REQUEST_RAW_TOPIC = "requests.raw"
 
 IP_FRAUD_THRESHOLD = 15
 IP_WINDOW_BURST_THRESHOLD = 8

@@ -12,10 +12,11 @@ The system follows a hybrid streaming plus batch architecture:
 
 1. Generate or ingest AI ad-request traffic.
 2. Publish raw requests to Kafka.
-3. Run real-time fraud analysis in Flink.
-4. Send approved requests to moderation.
-5. Forward moderation-approved requests to ad injection.
-6. Run offline analytics and model training in Spark.
+3. Run real-time shallow fraud analysis in Flink.
+4. Send suspicious requests to RFC model scoring.
+5. Send fraud-clean requests to moderation.
+6. Forward moderation-approved requests to ad injection.
+7. Run offline analytics and model training in Spark.
 
 ## Technology Stack
 
@@ -33,12 +34,19 @@ The system follows a hybrid streaming plus batch architecture:
 
 ```mermaid
 flowchart LR
-    A[Request Simulator] --> B[Kafka request.raw]
+    A[Request Simulator] --> B[Kafka requests.raw]
     B --> C[Flink Fraud]
-    C --> D[Kafka moderation.requests]
-    D --> E[Moderation Service]
-    E --> F[Kafka ad.injection]
-    C --> G[Spark Historical Export and Training]
+    C --> D[Kafka requests.sus]
+    D --> E[RFC Scoring Service]
+    E --> F[Kafka requests.clean]
+    C --> F
+    C --> G[Kafka requests.fraud]
+    E --> G
+    F --> H[Moderation Service]
+    H --> I[Kafka ad.injection]
+    H --> G
+    G --> J[Spark Historical Export and Training]
+    I --> J
 ```
 
 ## Repository Landmarks
@@ -61,12 +69,14 @@ flowchart LR
 | `docs/event_flow.md` | Request lifecycle and event movement |
 | `docs/kafka_topics.md` | Topic contracts and streaming boundaries |
 | `docs/flink_processing.md` | Real-time detection design and current implementation |
+| `docs/flink_fraud_detection_rules.md` | Implemented Flink fraud rules grouped by user, session, publisher, and request signals |
 | `docs/spark_analytics.md` | Offline analytics and historical processing |
 | `docs/fraud_detection_logic.md` | Rule logic, scoring, and fraud categories |
 | `docs/event_schemas.md` | Current JSON payloads across the pipeline |
 | `docs/request_simulator.md` | Synthetic traffic generation strategy |
 | `docs/moderation_service.md` | Moderation stage responsibilities |
 | `docs/implementation_status.md` | Current implementation state |
+| `docs/new_architecture_plan/` | Phased plan for the new topic and service architecture |
 
 ## Current Engineering Position
 

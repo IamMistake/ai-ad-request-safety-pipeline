@@ -17,5 +17,5 @@ traffic.
 
 ## Kafka Role
 
-The simulator publishes directly to `request.raw`. Flink fraud consumes that
+The simulator publishes directly to `requests.raw`. Flink fraud consumes that
 topic first and decides whether the request should continue to moderation.

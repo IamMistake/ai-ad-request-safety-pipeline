@@ -5,26 +5,27 @@
 `flink_service/fraud_detection.py` is the current real-time fraud detection
 service. It consumes raw request events from Kafka, assigns event-time
 watermarks, applies identity keyed fraud rules with managed Flink state,
-applies publisher keyed profiling, emits verdicts, and forwards approved
-requests to moderation.
+applies publisher keyed profiling, and routes requests to clean, suspicious, or
+blocked topic boundaries.
 
 ## Current Entry Point
 
 - File: `flink_service/fraud_detection.py`
-- Kafka source topic: `request.raw`
+- Kafka source topic: `requests.raw`
 - Consumer group: `flink-fraud-consumer`
 
 ## Current Processing Pipeline
 
 ```mermaid
 flowchart LR
-    A[KafkaSource request.raw] --> B[Assign event-time watermarks]
+    A[KafkaSource requests.raw] --> B[Assign event-time watermarks]
     B --> C[Key by user_ip]
     C --> D[Identity fraud detector]
     D --> E[Key by publisher_id]
     E --> F[Publisher profiler]
-    F --> G[fraud.verdicts]
-    F --> H[moderation.requests for approved requests]
+    F --> G[requests.clean]
+    F --> H[requests.sus]
+    F --> I[requests.fraud]
 ```
 
 ## Current Rule Set
@@ -40,8 +41,15 @@ flowchart LR
 | Session burst | Score repeated requests from one session |
 | Geo churn | Track country distribution and recent country shifts per identity |
 
-## Forwarding Rule
+## Target Forwarding Rule
 
-The job forwards `clean` requests to `moderation.requests`. It also forwards
-`suspicious` requests when `FORWARD_SUSPICIOUS_TO_MODERATION` is `True` in
-`flink_service/constants.py`.
+The target forwarding rule is:
+
+```text
+score < 0.5          -> requests.clean
+0.5 <= score < 0.8   -> requests.sus
+score >= 0.8         -> requests.fraud
+```
+
+Phase 4 of `docs/new_architecture_plan/` will complete the Flink routing and
+rule cleanup.

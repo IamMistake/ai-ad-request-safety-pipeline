@@ -7,18 +7,23 @@ sequenceDiagram
     participant Sim as Request Simulator
     participant Kafka as Kafka Broker
     participant Flink as Flink Fraud Processor
+    participant RFC as RFC Scoring Service
     participant Mod as Moderation Service
     participant Ad as Ad Injection
     participant Spark as Spark Analytics
 
-    Sim->>Kafka: Publish raw request to request.raw
+    Sim->>Kafka: Publish raw request to requests.raw
     Kafka->>Flink: Deliver raw request
     Flink->>Flink: Apply fraud rules
-    Flink-->>Kafka: Publish fraud.verdicts
-    Flink-->>Kafka: Publish approved request to moderation.requests
+    Flink-->>Kafka: Publish clean request to requests.clean
+    Flink-->>Kafka: Publish suspicious request to requests.sus
+    Flink-->>Kafka: Publish blocked request to requests.fraud
+    Kafka->>RFC: Deliver suspicious request
+    RFC-->>Kafka: Publish RFC-clean request to requests.clean
+    RFC-->>Kafka: Publish RFC-fraud request to requests.fraud
     Kafka->>Mod: Deliver request for moderation
-    Mod-->>Kafka: Publish moderation.verdicts
     Mod-->>Kafka: Publish clean request to ad.injection
+    Mod-->>Kafka: Publish unsafe request to requests.fraud
     Kafka->>Ad: Deliver approved request
     Kafka->>Spark: Historical export / batch input
 ```
@@ -28,22 +33,24 @@ sequenceDiagram
 1. Request creation
    The simulator creates synthetic request events with identifiers, prompt text, metadata, and session information.
 2. Kafka ingestion
-   Raw requests are published to `request.raw`.
+   Raw requests are published to `requests.raw`.
 3. Fraud processing
-   Flink applies the former shallow checks and the richer stream-time rules inside one keyed fraud stage.
-4. Moderation processing
-   Clean requests, and suspicious requests when enabled by one Flink constant, are forwarded to moderation.
-5. Ad injection
+   Flink applies shallow stream-time rules and routes requests to `requests.clean`, `requests.sus`, or `requests.fraud`.
+4. RFC scoring
+   Suspicious requests are scored by the offline-trained model and routed to `requests.clean` or `requests.fraud`.
+5. Moderation processing
+   Fraud-clean requests are checked by moderation and routed to `ad.injection` or `requests.fraud`.
+6. Ad injection
    Only moderation-clean requests reach `ad.injection`.
-6. Historical analytics and training
+7. Historical analytics and training
    Spark consumes historical logs built from Kafka topics.
 
 ## Current Topic Boundaries
 
 | Topic | Context |
 | --- | --- |
-| `request.raw` | Raw ingress topic for simulator output |
-| `moderation.requests` | Fraud-approved requests waiting for moderation |
+| `requests.raw` | Raw ingress topic for simulator output |
+| `requests.sus` | Suspicious requests waiting for RFC scoring |
+| `requests.clean` | Fraud-clean requests waiting for moderation |
+| `requests.fraud` | Blocked fraud or unsafe requests |
 | `ad.injection` | Fully approved requests for ad injection |
-| `fraud.verdicts` | Fraud verdicts and session summaries |
-| `moderation.verdicts` | Moderation verdicts |

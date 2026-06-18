@@ -90,10 +90,10 @@ python spark_service/spark_training.py
 
 ## Kafka topics
 
-- `request.raw`
-- `moderation.requests`
-- `fraud.verdicts`
-- `moderation.verdicts`
+- `requests.raw`
+- `requests.sus`
+- `requests.clean`
+- `requests.fraud`
 - `ad.injection`
 
 ## Notes

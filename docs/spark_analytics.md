@@ -11,7 +11,7 @@ signals, and training an offline fraud model.
 
 ```mermaid
 flowchart LR
-    A[Kafka topics request.raw + fraud.verdicts + moderation.requests + moderation.verdicts + ad.injection] --> B[historical_exporter.py]
+    A[Kafka topics requests.raw + requests.sus + requests.clean + requests.fraud + ad.injection] --> B[historical_exporter.py]
     B --> C[Historical request_logs.json]
     C --> D[Load with Spark]
     D --> E[Feature engineering]
@@ -28,3 +28,6 @@ flowchart LR
 | `asn` | Network-level signal from `optional_context.asn` |
 | `fraud_score_feature` | Fraud score produced by the Flink verdict |
 | `label` | Fraud label derived from historical combined verdicts |
+
+Phase 5 of `docs/new_architecture_plan/` will update Spark/export behavior for
+the new topics and RFC model artifacts.
