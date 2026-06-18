@@ -3,7 +3,7 @@
 ## Phase 1: Stabilize Sequential Pipeline
 
 - keep local end-to-end demo runs repeatable
-- harden `request.raw -> moderation.requests -> ad.injection`
+- harden `requests.raw -> requests.clean/requests.sus/requests.fraud -> ad.injection`
 - improve integration coverage for clean, fraud-blocked, and moderation-blocked requests
 
 ## Phase 2: Strengthen Real-Time Fraud Detection

@@ -4,15 +4,15 @@
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Project architecture | Established | Core pipeline direction is documented and preserved |
+| Project architecture | Being replaced in phases | New target topics and service boundaries are documented under `docs/new_architecture_plan/` |
 | Docker infrastructure | Implemented | Kafka, Zookeeper, and Kafka UI are present |
-| Request simulator | Implemented as ingestion prototype | Streams transformed WildChat user-prompt Arrow rows directly to `request.raw` |
-| Debug consumer | Implemented for local inspection | Useful for observing local topic traffic |
-| Flink fraud processor | Implemented as current main runtime processor | Consumes `request.raw`, emits `fraud.verdicts`, and forwards approved requests to `moderation.requests` |
+| Request simulator | Implemented as ingestion prototype | Topic rename to `requests.raw` is planned in Phase 3 |
+| Debug consumer | Updated for new topic visibility | Listens to `requests.raw`, `requests.sus`, `requests.clean`, `requests.fraud`, and `ad.injection` |
+| Flink fraud processor | Implemented as current main runtime processor | Phase 4 will replace its outputs with `requests.clean`, `requests.sus`, and `requests.fraud` |
 | Moderation service | Prototype implementation | `.env`-configured moderation consumer supports cached mock moderation by default and an OpenAI moderation-provider mode |
 | Ad injection consumer | Placeholder implementation | Consumes fully approved `ad.injection` requests |
-| Spark analytics and training | Implemented as batch prototype | Historical exporter consumes Kafka topics into JSONL logs; Spark training aggregates risk rollups and trains a model with metrics artifacts |
-| End-to-end orchestration | Implemented as sequential prototype | `request.raw -> Flink fraud -> moderation.requests -> moderation -> ad.injection` is wired end to end |
+| Spark analytics and training | Implemented as batch prototype | Phase 5 will update exporter/training around the new topics and RFC model artifacts |
+| End-to-end orchestration | Prototype changing | Target path is `requests.raw -> Flink -> requests.clean/requests.sus/requests.fraud -> moderation -> ad.injection` |
 
 ## Implemented Components
 
@@ -31,9 +31,12 @@
 | Moderation block flow test script | `scripts/test_moderation_block_flow.sh` |
 | Ad injection placeholder consumer | `pipeline_consumers/ad_injection_consumer.py` |
 | Moderation detection consumer | `pipeline_consumers/moderation_consumer.py` |
+| New architecture phase plan | `docs/new_architecture_plan/` |
 
 ## Current Development Priorities
 
-1. Replace the placeholder ad-injection consumer with a real service.
-2. Grow historical training data volume and labeling coverage.
-3. Switch moderation from mock mode to a real OpenAI-backed deployment configuration.
+1. Complete Phase 1 topic/docs/debug-consumer alignment.
+2. Add shared event helpers for copied event enrichment.
+3. Replace Flink routing with `requests.clean`, `requests.sus`, and `requests.fraud`.
+4. Update Spark training to produce RFC model artifacts.
+5. Implement the RFC scoring service.

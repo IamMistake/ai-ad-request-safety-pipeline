@@ -18,16 +18,19 @@ an AI monetization platform.
 | Prompt caching | Cache normalized prompts to avoid repeat provider calls |
 | Mock moderation | Default local mode uses rule-based moderation for repeatable tests |
 | OpenAI moderation | Optional provider mode uses the OpenAI Moderation API |
-| Moderation verdict publication | Emit results to `moderation.verdicts` |
+| Unsafe request blocking | Publish blocked unsafe requests to `requests.fraud` |
 | Final approval forwarding | Publish only clean requests to `ad.injection` |
 
 ## Planned Streaming Position
 
 ```mermaid
 flowchart LR
-    A[request.raw] --> B[Flink Fraud]
-    B --> C[moderation.requests]
+    A[requests.raw] --> B[Flink Fraud]
+    B --> C[requests.clean]
     C --> D[Moderation Service]
-    D --> E[moderation.verdicts]
+    D --> E[requests.fraud]
     D --> F[ad.injection]
 ```
+
+Phase 7 of `docs/new_architecture_plan/` will replace the moderation logic with
+TF-IDF/cosine-similarity gating plus selective OpenAI calls.

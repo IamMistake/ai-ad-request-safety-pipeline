@@ -4,21 +4,30 @@ from kafka import KafkaConsumer
 
 from pipeline_consumers.constants import (
     AD_INJECTION_TOPIC,
-    FRAUD_VERDICTS_TOPIC,
     KAFKA_API_VERSION,
     KAFKA_BOOTSTRAP,
-    MODERATION_REQUESTS_TOPIC,
-    MODERATION_VERDICTS_TOPIC,
-    REQUEST_RAW_TOPIC,
+    REQUESTS_CLEAN_TOPIC,
+    REQUESTS_FRAUD_TOPIC,
+    REQUESTS_RAW_TOPIC,
+    REQUESTS_SUS_TOPIC,
 )
 
 TOPICS = [
-    REQUEST_RAW_TOPIC,
-    MODERATION_REQUESTS_TOPIC,
+    REQUESTS_RAW_TOPIC,
+    REQUESTS_SUS_TOPIC,
+    REQUESTS_CLEAN_TOPIC,
+    REQUESTS_FRAUD_TOPIC,
     AD_INJECTION_TOPIC,
-    FRAUD_VERDICTS_TOPIC,
-    MODERATION_VERDICTS_TOPIC,
 ]
+
+TOPIC_DESCRIPTIONS = {
+    REQUESTS_RAW_TOPIC: "raw request for fraud detection",
+    REQUESTS_SUS_TOPIC: "suspicious request waiting for RFC scoring",
+    REQUESTS_CLEAN_TOPIC: "fraud-clean request ready for moderation",
+    REQUESTS_FRAUD_TOPIC: "blocked fraud or unsafe request",
+    AD_INJECTION_TOPIC: "fully approved request for ad finding",
+}
+
 
 def main():
     print("🔥 Kafka Multi-Topic Debug Consumer Started")
@@ -33,7 +42,7 @@ def main():
         api_version=KAFKA_API_VERSION,
         auto_offset_reset="earliest",
         enable_auto_commit=True,
-        value_deserializer=lambda v: json.loads(v.decode("utf-8"))
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
     )
 
     for msg in consumer:
@@ -43,16 +52,9 @@ def main():
         print(f"🧩 Message: {json.dumps(msg.value, indent=2)[:800]}")
         print("------------------------------------------\n")
 
-        if msg.topic == REQUEST_RAW_TOPIC:
-            print("placeholder: received raw request")
-        elif msg.topic == MODERATION_REQUESTS_TOPIC:
-            print("placeholder: received fraud-approved request for moderation")
-        elif msg.topic == AD_INJECTION_TOPIC:
-            print("placeholder: received fully approved request for ad injection")
-        elif msg.topic == FRAUD_VERDICTS_TOPIC:
-            print("placeholder: received fraud verdict event")
-        elif msg.topic == MODERATION_VERDICTS_TOPIC:
-            print("received moderation verdict event")
+        print(
+            f"placeholder: received {TOPIC_DESCRIPTIONS.get(msg.topic, 'unknown event')}"
+        )
 
 
 if __name__ == "__main__":

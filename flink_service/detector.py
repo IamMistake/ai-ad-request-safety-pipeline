@@ -95,7 +95,10 @@ class FraudDetector(KeyedProcessFunction):
     @staticmethod
     def _is_mobile_or_tablet(user_agent: str) -> bool:
         lower_ua = user_agent.lower()
-        return any(marker in lower_ua for marker in ("iphone", "ipad", "android", "mobile", "tablet"))
+        return any(
+            marker in lower_ua
+            for marker in ("iphone", "ipad", "android", "mobile", "tablet")
+        )
 
     @staticmethod
     def _is_suspicious_user_agent(user_agent: str) -> bool:
@@ -435,9 +438,14 @@ class FraudDetector(KeyedProcessFunction):
         score = 0.0
 
         repeat_threshold = (
-            MOBILE_IP_REPEAT_SECONDS if self._is_mobile_or_tablet(user_agent) else DESKTOP_IP_REPEAT_SECONDS
+            MOBILE_IP_REPEAT_SECONDS
+            if self._is_mobile_or_tablet(user_agent)
+            else DESKTOP_IP_REPEAT_SECONDS
         )
-        if inter_request_gap_seconds is not None and inter_request_gap_seconds <= repeat_threshold:
+        if (
+            inter_request_gap_seconds is not None
+            and inter_request_gap_seconds <= repeat_threshold
+        ):
             reasons.append("ip_repeat")
             score += IP_REPEAT_PENALTY
 
