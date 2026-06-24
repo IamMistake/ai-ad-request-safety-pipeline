@@ -177,3 +177,23 @@ Published to `ad.injection` after fraud/RFC and moderation approval.
   }
 }
 ```
+
+## Shared Event Helpers
+
+`shared/events.py` centralizes the copied event enrichment shape used by later
+pipeline phases.
+
+| Helper | Adds or builds |
+| --- | --- |
+| `add_fraud_context(event, verdict, score, reasons)` | Returns a copied request event with a `fraud` object from Flink |
+| `add_rfc_context(event, verdict, score, model_version, reasons)` | Returns a copied request event with an `rfc` object from RFC scoring |
+| `add_moderation_context(event, verdict, method, score, reasons)` | Returns a copied request event with a `moderation` object |
+| `build_blocked_event(event, source, verdict, score, reasons)` | Returns the centralized `requests.fraud` blocked-event shape |
+
+The helpers deep-copy events before enriching them. Callers should treat input
+events as immutable and publish only the returned dict.
+
+`build_blocked_event` preserves the full original request under `request` and
+copies common top-level identifiers (`event_time`, `req_id`, `publisher_id`) when
+present. Its allowed `source` values are `flink`, `rfc_scoring`, and
+`moderation`; its allowed `verdict` values are `fraud` and `unsafe`.
