@@ -12,6 +12,7 @@
 | Moderation service | Prototype implementation | `.env`-configured moderation consumer supports cached mock moderation by default and an OpenAI moderation-provider mode |
 | Ad injection consumer | Placeholder implementation | Consumes fully approved `ad.injection` requests |
 | Spark analytics and training | Implemented as batch prototype | Phase 5 will update exporter/training around the new topics and RFC model artifacts |
+| Shared event helpers | Implemented | `shared/events.py` provides copied enrichment helpers and centralized blocked-event construction |
 | End-to-end orchestration | Prototype changing | Target path is `requests.raw -> Flink -> requests.clean/requests.sus/requests.fraud -> moderation -> ad.injection` |
 
 ## Implemented Components
@@ -31,12 +32,12 @@
 | Moderation block flow test script | `scripts/test_moderation_block_flow.sh` |
 | Ad injection placeholder consumer | `pipeline_consumers/ad_injection_consumer.py` |
 | Moderation detection consumer | `pipeline_consumers/moderation_consumer.py` |
+| Shared event enrichment helpers | `shared/events.py` |
 | New architecture phase plan | `docs/new_architecture_plan/` |
 
 ## Current Development Priorities
 
-1. Complete Phase 1 topic/docs/debug-consumer alignment.
-2. Add shared event helpers for copied event enrichment.
-3. Replace Flink routing with `requests.clean`, `requests.sus`, and `requests.fraud`.
-4. Update Spark training to produce RFC model artifacts.
-5. Implement the RFC scoring service.
+1. Replace Flink routing with `requests.clean`, `requests.sus`, and `requests.fraud`.
+2. Update Spark training to produce RFC model artifacts.
+3. Implement the RFC scoring service.
+4. Wire moderation and ad finding into the enriched event flow.

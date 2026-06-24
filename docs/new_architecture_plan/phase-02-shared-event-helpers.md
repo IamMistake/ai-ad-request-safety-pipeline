@@ -1,5 +1,9 @@
 # Phase 2: Shared Event Helpers
 
+## Status
+
+Implemented in `shared/events.py`.
+
 ## Goal
 
 Prevent schema drift before rewriting services.
