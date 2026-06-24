@@ -1,5 +1,9 @@
 # Phase 3: Simulator Topic Update
 
+## Status
+
+Implemented in `kafka/producers/simulator_constants.py`.
+
 ## Goal
 
 Move ingestion to the new topic while keeping the existing nested request schema

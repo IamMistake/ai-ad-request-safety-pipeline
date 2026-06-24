@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Project architecture | Being replaced in phases | New target topics and service boundaries are documented under `docs/new_architecture_plan/` |
 | Docker infrastructure | Implemented | Kafka, Zookeeper, and Kafka UI are present |
-| Request simulator | Implemented as ingestion prototype | Topic rename to `requests.raw` is planned in Phase 3 |
+| Request simulator | Implemented as ingestion prototype | Publishes nested request events to `requests.raw` |
 | Debug consumer | Updated for new topic visibility | Listens to `requests.raw`, `requests.sus`, `requests.clean`, `requests.fraud`, and `ad.injection` |
 | Flink fraud processor | Implemented as current main runtime processor | Phase 4 will replace its outputs with `requests.clean`, `requests.sus`, and `requests.fraud` |
 | Moderation service | Prototype implementation | `.env`-configured moderation consumer supports cached mock moderation by default and an OpenAI moderation-provider mode |

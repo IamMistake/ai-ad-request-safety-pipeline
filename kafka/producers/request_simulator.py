@@ -1,11 +1,21 @@
 import json
+import sys
 import time
+from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.ipc as ipc
 from kafka import KafkaProducer
 
-from simulator_constants import DATASET_PATH, DEFAULT_RATE_PER_SEC, KAFKA_BOOTSTRAP, KAFKA_TOPIC
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from simulator_constants import (
+    DATASET_PATH,
+    DEFAULT_RATE_PER_SEC,
+    KAFKA_API_VERSION,
+    KAFKA_BOOTSTRAP,
+    KAFKA_TOPIC,
+)
 from simulator_events import build_request_event, validate_row
 
 
@@ -21,6 +31,7 @@ def simulate_request(row: dict, producer: KafkaProducer) -> bool:
 def run_simulator(rate_per_sec: float = DEFAULT_RATE_PER_SEC):
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP,
+        api_version=KAFKA_API_VERSION,
         value_serializer=lambda value: json.dumps(value).encode("utf-8"),
     )
 
