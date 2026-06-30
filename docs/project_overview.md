@@ -59,22 +59,19 @@ flowchart LR
 | `flink_service/fraud_detection.py` | Current real-time fraud detection prototype |
 | `pipeline_consumers/moderation_consumer.py` | Moderation prototype with `.env` configuration |
 | `pipeline_consumers/ad_injection_consumer.py` | Placeholder ad-injection consumer |
-| `spark_service/spark_training.py` | Current offline analytics and model training prototype |
+| `spark_service/spark_training.py` | Existing Spark prototype; new plan not written yet |
 
 ## Documentation Map
 
 | Document | Focus |
 | --- | --- |
-| `docs/current_architecture.md` | Preserved architecture and component responsibilities |
-| `docs/event_flow.md` | Request lifecycle and event movement |
+| `docs/current_architecture.md` | Architecture, event flow, topic boundaries, and component responsibilities |
 | `docs/kafka_topics.md` | Topic contracts and streaming boundaries |
-| `docs/flink_processing.md` | Real-time detection design and current implementation |
-| `docs/flink_fraud_detection_rules.md` | Implemented Flink fraud rules grouped by user, session, publisher, and request signals |
-| `docs/spark_analytics.md` | Offline analytics and historical processing |
-| `docs/fraud_detection_logic.md` | Rule logic, scoring, and fraud categories |
+| `docs/flink_processing.md` | Current Flink starter and future rule plan |
+| `docs/spark_analytics.md` | Spark placeholder until a new plan is written |
 | `docs/event_schemas.md` | Current JSON payloads across the pipeline |
 | `docs/request_simulator.md` | Synthetic traffic generation strategy |
-| `docs/moderation_service.md` | Moderation stage responsibilities |
+| `docs/moderation_service.md` | Moderation responsibilities and near-term plan |
 | `docs/implementation_status.md` | Current implementation state |
 | `docs/new_architecture_plan/` | Phased plan for the new topic and service architecture |
 

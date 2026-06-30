@@ -2,11 +2,9 @@
 
 ## Purpose
 
-`flink_service/fraud_detection.py` is the current real-time fraud detection
-service. It consumes raw request events from Kafka, assigns event-time
-watermarks, applies identity keyed fraud rules with managed Flink state,
-applies publisher keyed profiling, and routes requests to clean, suspicious, or
-blocked topic boundaries.
+`flink_service/fraud_detection.py` is now a starter fraud gate. It keeps the
+Kafka and routing skeleton, but the old stateful fraud detector, publisher
+profiler, and session analytics stages were removed.
 
 ## Current Entry Point
 
@@ -19,38 +17,49 @@ blocked topic boundaries.
 ```mermaid
 flowchart LR
     A[KafkaSource requests.raw] --> B[Assign event-time watermarks]
-    B --> C[Key by user_ip]
-    C --> D[Identity fraud detector]
-    D --> E[Key by publisher_id]
-    E --> F[Publisher profiler]
-    F --> G[requests.clean]
-    F --> H[requests.sus]
-    F --> I[requests.fraud]
+    B --> C[detect_fraud event]
+    C --> D{verdict}
+    D --> E[requests.clean]
+    D --> F[requests.sus]
+    D --> G[requests.fraud]
 ```
 
 ## Current Rule Set
 
-| Rule | Description |
-| --- | --- |
-| IP request frequency | Flag repeated requests from the same IP identity |
-| IP event-time burst | Flag more than 8 requests from one identity in 60 event-time seconds |
-| Prompt similarity and repetition | Flag repeated normalized prompts in event-time windows and frequency maps |
-| Rapid repeat timing | Flag same-IP rapid repeats with mobile/desktop thresholds |
-| Suspicious or invalid UA | Score suspicious agents and malformed user agents |
-| Language-country mismatch | Score mismatches between language and country |
-| Session burst | Score repeated requests from one session |
-| Geo churn | Track country distribution and recent country shifts per identity |
+The previous stateful Flink fraud rules were deleted during cleanup. There are
+no active fraud rules yet.
+
+`detect_fraud(event)` currently returns clean for every valid parsed request:
+
+```python
+("clean", 0.0, [])
+```
+
+Invalid JSON is routed to `requests.fraud` as a blocked event.
+
+## Rule Plan
+
+Add new rules one at a time. Keep each rule small and obvious.
+
+Recommended order:
+
+1. Missing or invalid request fields.
+2. Bad or automated user agent.
+3. Basic IP burst rule.
+4. Basic prompt repetition rule.
+5. Score thresholds for `clean`, `suspicious`, and `fraud`.
+
+Only create a separate `flink_service/rules.py` after `detect_fraud(event)` gets
+too large to read comfortably.
 
 ## Target Forwarding Rule
 
-The target forwarding rule is:
+The starter keeps the target topic boundaries:
 
 ```text
-score < 0.5          -> requests.clean
-0.5 <= score < 0.8   -> requests.sus
-score >= 0.8         -> requests.fraud
+clean      -> requests.clean
+suspicious -> requests.sus
+fraud      -> requests.fraud
 ```
 
-Flink publishes enriched request events to `requests.clean` and `requests.sus`.
-Fraud blocks are published to `requests.fraud` using the shared blocked-event
-shape.
+Future scoring thresholds can be added after the first real rules exist.

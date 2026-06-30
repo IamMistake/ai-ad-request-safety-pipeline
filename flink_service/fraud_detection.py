@@ -6,7 +6,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from pyflink.common import Duration, Time, Types
+from pyflink.common import Duration, Types
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.watermark_strategy import TimestampAssigner, WatermarkStrategy
 from pyflink.datastream import StreamExecutionEnvironment
@@ -16,6 +16,7 @@ from pyflink.datastream.connectors.kafka import (
     KafkaSink,
     KafkaSource,
 )
+
 from flink_service.constants import (
     FRAUD_CONSUMER_GROUP,
     FRAUD_JOB_NAME,
@@ -25,27 +26,9 @@ from flink_service.constants import (
     REQUESTS_SUS_TOPIC,
     REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
     REQUEST_RAW_TOPIC,
-    SESSION_WINDOW_GAP_SECONDS,
 )
-from flink_service.detector import FraudDetector
-from flink_service.events import (
-    extract_identity_key,
-    extract_publisher_key,
-    extract_publisher_session_key,
-    extract_event_timestamp_ms,
-    has_verdict,
-    is_request_verdict,
-    load_event,
-    verdict_to_blocked_request,
-    verdict_to_routed_request,
-)
-from flink_service.publisher_profiler import PublisherProfiler
-from flink_service.session_analytics import (
-    SessionFeatureTracker,
-    SessionMetricsAggregateFunction,
-    SessionMetricsWindowFunction,
-)
-from pyflink.datastream.window import EventTimeSessionWindows
+from flink_service.events import extract_event_timestamp_ms, load_event
+from shared.events import add_fraud_context, build_blocked_event
 
 
 class RequestTimestampAssigner(TimestampAssigner):
@@ -56,40 +39,81 @@ class RequestTimestampAssigner(TimestampAssigner):
         return event_timestamp_ms
 
 
-def format_verdict_log_line(raw_value: str) -> str:
-    verdict = load_event(raw_value)
-    if "_parse_error" in verdict:
-        return f"[flink-fraud] ERROR parse={verdict['_parse_error']}"
+def detect_fraud(event: dict) -> tuple[str, float, list[str]]:
+    # ponytail: clean-by-default starter; add one rule here when needed.
+    return "clean", 0.0, []
 
-    record_type = str(verdict.get("record_type", "")).strip()
-    if record_type == "session_summary":
-        return ""
 
-    if record_type != "request_verdict":
-        return f"[flink-fraud] UNKNOWN record_type={record_type or 'missing'}"
-
-    req_id = str(verdict.get("req_id", "")).strip() or "unknown"
-    verdict_label = str(verdict.get("verdict", "clean")).upper()
-    score = float(verdict.get("fraud_score", 0.0) or 0.0)
-    reasons = verdict.get("reasons", [])
-    if not isinstance(reasons, list):
-        reasons = [str(reasons)]
-
-    if verdict_label == "CLEAN":
-        target_topic = REQUESTS_CLEAN_TOPIC
-    elif verdict_label == "SUSPICIOUS":
-        target_topic = REQUESTS_SUS_TOPIC
-    else:
-        target_topic = REQUESTS_FRAUD_TOPIC
-
-    if reasons:
-        return (
-            f"[flink-fraud] {verdict_label} req_id={req_id} "
-            f"score={score} reasons={json.dumps(reasons)} -> {target_topic}"
+def route_request(raw_value: str) -> str:
+    event = load_event(raw_value)
+    if "_parse_error" in event:
+        return json.dumps(
+            build_blocked_event(
+                {"raw": raw_value},
+                "flink",
+                "fraud",
+                1.0,
+                [event["_parse_error"]],
+            )
         )
 
+    verdict, score, reasons = detect_fraud(event)
+    verdict = str(verdict).strip().lower()
+    if verdict not in {"clean", "suspicious", "fraud"}:
+        verdict = "fraud"
+        score = 1.0
+        reasons = ["invalid_fraud_verdict"]
+
+    enriched = add_fraud_context(event, verdict, score, reasons)
+
+    if verdict == "fraud":
+        blocked = build_blocked_event(enriched, "flink", "fraud", score, reasons)
+        return json.dumps(blocked)
+
+    return json.dumps(enriched)
+
+
+def route_key(routed_value: str) -> str:
+    event = load_event(routed_value)
+    if event.get("source") == "flink" and event.get("verdict") == "fraud":
+        return "fraud"
+
+    fraud = event.get("fraud")
+    if isinstance(fraud, dict):
+        verdict = str(fraud.get("verdict", "clean")).strip().lower()
+        if verdict in {"clean", "suspicious", "fraud"}:
+            return verdict
+
+    return "fraud"
+
+
+def format_log_line(routed_value: str) -> str:
+    event = load_event(routed_value)
+    if event.get("source") == "flink" and event.get("verdict") == "fraud":
+        req_id = str(event.get("req_id", "unknown"))
+        reasons = event.get("reasons", [])
+        return (
+            f"[flink-fraud] FRAUD req_id={req_id} "
+            f"reasons={json.dumps(reasons)} -> {REQUESTS_FRAUD_TOPIC}"
+        )
+
+    fraud = event.get("fraud")
+    if not isinstance(fraud, dict):
+        return f"[flink-fraud] UNKNOWN -> {REQUESTS_FRAUD_TOPIC}"
+
+    verdict = str(fraud.get("verdict", "clean")).lower()
+    score = float(fraud.get("score", 0.0) or 0.0)
+    req_id = str(event.get("req_id", "unknown"))
+
+    target_topic = REQUESTS_CLEAN_TOPIC
+    if verdict == "suspicious":
+        target_topic = REQUESTS_SUS_TOPIC
+    elif verdict == "fraud":
+        target_topic = REQUESTS_FRAUD_TOPIC
+
     return (
-        f"[flink-fraud] {verdict_label} req_id={req_id} score={score} -> {target_topic}"
+        f"[flink-fraud] {verdict.upper()} req_id={req_id} "
+        f"score={score} -> {target_topic}"
     )
 
 
@@ -130,7 +154,7 @@ def main() -> None:
     add_connector_jars(env)
 
     print(
-        "flink-fraud processor started: "
+        "flink-fraud starter started: "
         f"{REQUEST_RAW_TOPIC} -> {REQUESTS_CLEAN_TOPIC}/{REQUESTS_SUS_TOPIC}/{REQUESTS_FRAUD_TOPIC}"
     )
 
@@ -146,56 +170,19 @@ def main() -> None:
         ).with_timestamp_assigner(RequestTimestampAssigner())
     )
 
-    analyzed = watermarked_requests.key_by(extract_identity_key).process(
-        FraudDetector(),
-        output_type=Types.STRING(),
+    routed = watermarked_requests.map(route_request, output_type=Types.STRING())
+
+    routed.filter(lambda raw: route_key(raw) == "clean").sink_to(
+        build_kafka_sink(REQUESTS_CLEAN_TOPIC)
+    )
+    routed.filter(lambda raw: route_key(raw) == "suspicious").sink_to(
+        build_kafka_sink(REQUESTS_SUS_TOPIC)
+    )
+    routed.filter(lambda raw: route_key(raw) == "fraud").sink_to(
+        build_kafka_sink(REQUESTS_FRAUD_TOPIC)
     )
 
-    profiled = analyzed.key_by(extract_publisher_key).process(
-        PublisherProfiler(),
-        output_type=Types.STRING(),
-    )
-
-    session_enriched = watermarked_requests.key_by(
-        extract_publisher_session_key
-    ).process(
-        SessionFeatureTracker(),
-        output_type=Types.STRING(),
-    )
-
-    session_summaries = (
-        session_enriched.key_by(extract_publisher_session_key)
-        .window(
-            EventTimeSessionWindows.with_gap(Time.seconds(SESSION_WINDOW_GAP_SECONDS))
-        )
-        .aggregate(
-            SessionMetricsAggregateFunction(),
-            SessionMetricsWindowFunction(),
-            output_type=Types.STRING(),
-        )
-    )
-
-    request_verdicts = profiled.filter(is_request_verdict)
-
-    request_verdicts.filter(lambda raw: has_verdict(raw, "clean")).map(
-        verdict_to_routed_request,
-        output_type=Types.STRING(),
-    ).sink_to(build_kafka_sink(REQUESTS_CLEAN_TOPIC))
-
-    request_verdicts.filter(lambda raw: has_verdict(raw, "suspicious")).map(
-        verdict_to_routed_request,
-        output_type=Types.STRING(),
-    ).sink_to(build_kafka_sink(REQUESTS_SUS_TOPIC))
-
-    request_verdicts.filter(lambda raw: has_verdict(raw, "fraud")).map(
-        verdict_to_blocked_request,
-        output_type=Types.STRING(),
-    ).sink_to(build_kafka_sink(REQUESTS_FRAUD_TOPIC))
-
-    request_verdicts.map(
-        format_verdict_log_line,
-        output_type=Types.STRING(),
-    ).filter(lambda line: bool(line)).print()
+    routed.map(format_log_line, output_type=Types.STRING()).print()
 
     env.execute(FRAUD_JOB_NAME)
 

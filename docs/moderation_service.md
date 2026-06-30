@@ -32,5 +32,13 @@ flowchart LR
     D --> F[ad.injection]
 ```
 
-Phase 7 of `docs/new_architecture_plan/` will replace the moderation logic with
-TF-IDF/cosine-similarity gating plus selective OpenAI calls.
+## Current Direction
+
+The moderation pipeline is sequential, not parallel. Only requests that passed
+Flink/RFC fraud checks should arrive on `requests.clean`.
+
+Immediate goals:
+
+1. Keep the default mock mode for reliable local tests.
+2. Support `MODERATION_PROVIDER=openai` through `.env`.
+3. Later add TF-IDF/cosine-similarity gating before selective OpenAI calls.
