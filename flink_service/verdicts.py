@@ -70,7 +70,6 @@ def build_identity_verdict(
         "ua_hash": ua_hash,
         "user_ip": user_ip,
         "prompt_preview": prompt[:80],
-        "forward_to_moderation": verdict != "fraud",
     }
 
 

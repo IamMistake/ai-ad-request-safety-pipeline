@@ -6,10 +6,10 @@ It is based on the executable code, not planned behavior.
 ## Verdict Logic
 
 - Fraud score starts at `0.0` and each triggered rule adds to it.
-- Final score is capped at `1.0`.
+- Final score is capped to `0.0 <= score <= 1.0`.
 - `verdict = "fraud"` when `fraud_score >= 0.8`.
-- `verdict = "suspicious"` when at least one reason exists but score is below `0.8`.
-- `verdict = "clean"` when no rule triggers.
+- `verdict = "suspicious"` when `0.5 <= fraud_score < 0.8`.
+- `verdict = "clean"` when `fraud_score < 0.5`.
 
 Sources: `flink_service/detector.py`, `flink_service/verdicts.py`, `flink_service/constants.py`.
 
@@ -20,17 +20,17 @@ Sources: `flink_service/detector.py`, `flink_service/verdicts.py`, `flink_servic
     - Triggers when the time gap from the previous request for the same identity is too small.
     - Threshold is `<= 2.0` seconds for normal clients.
     - Threshold is `<= 3.0` seconds for mobile/tablet user agents.
-    - Adds reason `ip_repeat`.
+    - Adds reason `rapid_repeat`.
     - Adds score `0.6`.
   - high frequency from same identity/IP
     - Triggers when the per-identity request count is greater than `15` within the managed state TTL.
     - State TTL is `30` minutes.
-    - Adds reason `ip_high_frequency`.
+    - Adds reason `ip_burst`.
     - Adds score `0.4`.
   - IP/event-time burst
     - Triggers when the same identity has more than `8` requests in a `60` second event-time window.
     - Old timestamps are pruned using the `60` second window plus `5` seconds of allowed lateness.
-    - Adds reason `ip_window_burst`.
+    - Adds reason `ip_burst`.
     - Adds score `0.3`.
   - zero or near-zero inter-request gap
     - Triggers when the inter-request gap is less than `0.0001` seconds.
@@ -52,11 +52,11 @@ Sources: `flink_service/detector.py`, `flink_service/verdicts.py`, `flink_servic
   - session high velocity
     - Triggers when the same identity and `session_id` has more than `8` requests within state TTL.
     - State TTL is `30` minutes.
-    - Adds reason `session_high_velocity`.
+    - Adds reason `session_burst`.
     - Adds score `0.1`.
   - session analytics summary
     - This is not a blocking fraud rule today.
-    - Flink emits `record_type = "session_summary"` for session metrics.
+    - The session analytics module can build `record_type = "session_summary"` metrics, but Phase 4 routing does not publish them to the active request topics.
     - Current metrics include `prompts_per_session`, `avg_typing_gap_seconds`, `prompt_entropy`, and `conversation_complexity`.
     - Session summaries use event-time session windows with a `180` second gap.
   - impossible travel
@@ -81,12 +81,12 @@ Sources: `flink_service/detector.py`, `flink_service/verdicts.py`, `flink_servic
   - suspicious user agent
     - Triggers when the user agent contains suspicious automation markers.
     - Markers include `curl`, `python`, `wget`, `postmanruntime`, `bot`, `spider`, `crawler`, `httpclient`, and `java/`.
-    - Adds reason `suspicious_ua`.
+    - Adds reason `bad_user_agent`.
     - Adds score `0.1`.
   - invalid user agent
     - Triggers when the user agent is blank, `unknown_ua`, or does not contain a known valid marker.
     - Valid markers include browser and known-client markers such as `mozilla/5.0`, `chrome/`, `firefox/`, `safari/`, `curl/`, `python-urllib/`, `wget/`, and crawler identifiers.
-    - Adds reason `ua_invalid`.
+    - Adds reason `bad_user_agent`.
     - Adds score `0.2`.
   - negative keyword in prompt
     - Triggers when the prompt matches the negative keyword pattern.
@@ -96,22 +96,22 @@ Sources: `flink_service/detector.py`, `flink_service/verdicts.py`, `flink_servic
   - language/country mismatch
     - Triggers when the request language is known and non-English, the country is present, and the country is not allowed for that language profile.
     - Empty language, unknown language, blank country, English, or missing language profiles do not trigger it.
-    - Adds reason `language_country_mismatch`.
+    - Adds reason `country_language_mismatch`.
     - Adds score `0.2`.
   - prompt similarity burst
     - Triggers when the same normalized prompt hash appears more than `3` times for the same identity within `60` seconds.
     - Old prompt timestamps are pruned using the `60` second window plus `5` seconds of allowed lateness.
-    - Adds reason `prompt_similarity_burst`.
+    - Adds reason `prompt_repetition`.
     - Adds score `0.3`.
   - prompt repetition campaign
     - Triggers when the same normalized prompt hash count is greater than `5` for the same identity within state TTL.
     - State TTL is `30` minutes.
-    - Adds reason `prompt_repetition_campaign`.
+    - Adds reason `prompt_repetition`.
     - Adds score `0.2`.
 
 ## Source Files
 
-- `flink_service/fraud_detection.py` wires the Kafka source, keyed Flink processors, session analytics, and sinks.
+- `flink_service/fraud_detection.py` wires the Kafka source, keyed Flink processors, and clean/suspicious/fraud sinks.
 - `flink_service/detector.py` contains the main fraud scoring rules.
 - `flink_service/constants.py` contains the thresholds and state/window configuration.
 - `flink_service/prompt_features.py` normalizes prompt text and builds prompt hashes.

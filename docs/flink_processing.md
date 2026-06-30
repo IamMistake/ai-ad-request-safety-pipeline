@@ -51,5 +51,6 @@ score < 0.5          -> requests.clean
 score >= 0.8         -> requests.fraud
 ```
 
-Phase 4 of `docs/new_architecture_plan/` will complete the Flink routing and
-rule cleanup.
+Flink publishes enriched request events to `requests.clean` and `requests.sus`.
+Fraud blocks are published to `requests.fraud` using the shared blocked-event
+shape.

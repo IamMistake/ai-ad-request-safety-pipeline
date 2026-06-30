@@ -14,6 +14,7 @@ from pyflink.datastream.state import (
 
 from flink_service.constants import (
     FRAUD_SCORE_HARD_THRESHOLD,
+    FRAUD_SCORE_SUSPICIOUS_THRESHOLD,
     IP_FRAUD_THRESHOLD,
     PROMPT_SIMILARITY_SCORE,
     PROMPT_SIMILARITY_THRESHOLD,
@@ -85,6 +86,27 @@ VALID_UA_MARKERS = (
     "googlebot/",
     "bingbot/",
 )
+
+REASON_ALIASES = {
+    "ip_repeat": "rapid_repeat",
+    "suspicious_ua": "bad_user_agent",
+    "ua_invalid": "bad_user_agent",
+    "ip_high_frequency": "ip_burst",
+    "ip_window_burst": "ip_burst",
+    "prompt_similarity_burst": "prompt_repetition",
+    "prompt_repetition_campaign": "prompt_repetition",
+    "language_country_mismatch": "country_language_mismatch",
+    "session_high_velocity": "session_burst",
+}
+
+
+def canonical_reasons(reasons: list[str]) -> list[str]:
+    canonical = []
+    for reason in reasons:
+        mapped = REASON_ALIASES.get(str(reason), str(reason))
+        if mapped not in canonical:
+            canonical.append(mapped)
+    return canonical
 
 
 class FraudDetector(KeyedProcessFunction):
@@ -505,6 +527,8 @@ class FraudDetector(KeyedProcessFunction):
             reasons.append("geo_country_churn")
             score += 0.15
 
+        reasons = canonical_reasons(reasons)
+
         for reason in reasons:
             increment_map_counter(self.flag_metrics_state, str(reason))
 
@@ -516,16 +540,16 @@ class FraudDetector(KeyedProcessFunction):
         moderation_like_hits = sum(
             1
             for reason in reasons
-            if reason in {"negative_keyword", "language_country_mismatch"}
+            if reason in {"negative_keyword", "country_language_mismatch"}
         )
         if moderation_like_hits > 0:
             self.rolling_moderation_hits_state.add(float(moderation_like_hits))
 
-        score = round(min(score, 1.0), 3)
+        score = round(max(0.0, min(score, 1.0)), 3)
 
         if score >= FRAUD_SCORE_HARD_THRESHOLD:
             verdict = "fraud"
-        elif reasons:
+        elif score >= FRAUD_SCORE_SUSPICIOUS_THRESHOLD:
             verdict = "suspicious"
         else:
             verdict = "clean"

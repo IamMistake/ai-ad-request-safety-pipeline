@@ -1,17 +1,19 @@
 try:
     from pipeline_consumers.constants import (
-        AD_INJECTION_TOPIC,
-        FRAUD_VERDICTS_TOPIC,
         KAFKA_BOOTSTRAP,
-        MODERATION_REQUESTS_TOPIC,
-        REQUEST_RAW_TOPIC,
+        REQUESTS_CLEAN_TOPIC,
+        REQUESTS_FRAUD_TOPIC,
+        REQUESTS_RAW_TOPIC,
+        REQUESTS_SUS_TOPIC,
     )
 except ImportError:
-    AD_INJECTION_TOPIC = "ad.injection"
-    FRAUD_VERDICTS_TOPIC = "requests.fraud"
     KAFKA_BOOTSTRAP = "localhost:9092"
-    MODERATION_REQUESTS_TOPIC = "requests.clean"
-    REQUEST_RAW_TOPIC = "requests.raw"
+    REQUESTS_CLEAN_TOPIC = "requests.clean"
+    REQUESTS_FRAUD_TOPIC = "requests.fraud"
+    REQUESTS_RAW_TOPIC = "requests.raw"
+    REQUESTS_SUS_TOPIC = "requests.sus"
+
+REQUEST_RAW_TOPIC = REQUESTS_RAW_TOPIC
 
 IP_FRAUD_THRESHOLD = 15
 IP_WINDOW_BURST_THRESHOLD = 8
@@ -37,5 +39,3 @@ SESSION_BURST_PENALTY = 0.5
 NEGATIVE_KEYWORD_PENALTY = 0.7
 INVALID_UA_PENALTY = 0.2
 LANGUAGE_MISMATCH_PENALTY = 0.2
-
-FORWARD_SUSPICIOUS_TO_MODERATION = True

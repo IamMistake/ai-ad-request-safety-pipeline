@@ -1,5 +1,10 @@
 # Phase 4: Flink Routing And Rule Cleanup
 
+## Status
+
+Implemented in `flink_service/fraud_detection.py`, `flink_service/detector.py`,
+and `flink_service/events.py`.
+
 ## Goal
 
 Make Flink match the new architecture and clean the existing shallow fraud
