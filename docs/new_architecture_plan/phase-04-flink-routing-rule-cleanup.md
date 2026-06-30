@@ -2,8 +2,10 @@
 
 ## Status
 
-Implemented in `flink_service/fraud_detection.py`, `flink_service/detector.py`,
-and `flink_service/events.py`.
+Reset in `flink_service/fraud_detection.py`, `flink_service/events.py`, and
+`flink_service/constants.py`. The old stateful detector, publisher profiler,
+session analytics, and helper modules were deleted so rules can be rebuilt one
+by one.
 
 ## Goal
 

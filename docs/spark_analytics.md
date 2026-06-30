@@ -1,33 +1,14 @@
 # Spark Analytics
 
-## Purpose
+Spark analytics is not planned in detail yet.
 
-`spark_service/historical_exporter.py` and `spark_service/spark_training.py`
-provide the batch analytics side of the system. Together they are responsible
-for building historical request logs from Kafka topics, deriving aggregate risk
-signals, and training an offline fraud model.
+There is an existing prototype under `spark_service/`, but the new architecture
+cleanup has not reached the Spark stage. Do not treat the current Spark code as
+the final model-training or historical-export design.
 
-## Current Processing Flow
+Future plan should define:
 
-```mermaid
-flowchart LR
-    A[Kafka topics requests.raw + requests.sus + requests.clean + requests.fraud + ad.injection] --> B[historical_exporter.py]
-    B --> C[Historical request_logs.json]
-    C --> D[Load with Spark]
-    D --> E[Feature engineering]
-    E --> F[Aggregate risk statistics]
-    E --> G[Convert selected features to Pandas]
-    G --> H[Train RandomForestClassifier]
-```
-
-## Current Features In Use
-
-| Feature | Meaning |
-| --- | --- |
-| `contains_scam` | Whether prompt text matches known suspicious phrases |
-| `asn` | Network-level signal from `optional_context.asn` |
-| `fraud_score_feature` | Fraud score produced by the Flink verdict |
-| `label` | Fraud label derived from historical combined verdicts |
-
-Phase 5 of `docs/new_architecture_plan/` will update Spark/export behavior for
-the new topics and RFC model artifacts.
+1. Which Kafka topics or exported files become training input.
+2. What historical event schema Spark should read.
+3. What model artifacts the RFC scoring service should load.
+4. How training outputs are versioned and validated.

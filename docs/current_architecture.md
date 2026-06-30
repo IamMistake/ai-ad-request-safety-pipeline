@@ -25,6 +25,43 @@ flowchart LR
     G --> J
 ```
 
+## Primary Event Flow
+
+```mermaid
+sequenceDiagram
+    participant Sim as Request Simulator
+    participant Kafka as Kafka Broker
+    participant Flink as Flink Fraud Starter
+    participant RFC as RFC Scoring Service
+    participant Mod as Moderation Service
+    participant Ad as Ad Injection
+    participant Spark as Spark Analytics
+
+    Sim->>Kafka: Publish raw request to requests.raw
+    Kafka->>Flink: Deliver raw request
+    Flink-->>Kafka: Publish clean request to requests.clean
+    Flink-->>Kafka: Publish suspicious request to requests.sus
+    Flink-->>Kafka: Publish blocked request to requests.fraud
+    Kafka->>RFC: Deliver suspicious request
+    RFC-->>Kafka: Publish RFC-clean request to requests.clean
+    RFC-->>Kafka: Publish RFC-fraud request to requests.fraud
+    Kafka->>Mod: Deliver clean request for moderation
+    Mod-->>Kafka: Publish clean request to ad.injection
+    Mod-->>Kafka: Publish unsafe request to requests.fraud
+    Kafka->>Ad: Deliver approved request
+    Kafka->>Spark: Historical export / batch input
+```
+
+## Topic Boundaries
+
+| Topic | Context |
+| --- | --- |
+| `requests.raw` | Raw ingress topic for simulator output |
+| `requests.sus` | Suspicious requests waiting for RFC scoring |
+| `requests.clean` | Fraud-clean requests waiting for moderation |
+| `requests.fraud` | Blocked fraud or unsafe requests |
+| `ad.injection` | Fully approved requests for ad injection |
+
 ## Why This Shape Fits The Problem
 
 | Layer | Why it exists |
@@ -43,11 +80,11 @@ flowchart LR
 | Request Simulator | Build request events and publish them | `kafka/producers/request_simulator.py` |
 | Kafka Broker | Buffer, partition, and distribute events | `docker-compose.yml` |
 | Debug Consumer | Inspect messages during local development | `test_consumer.py` |
-| Flink Fraud Processor | Apply real-time fraud rules over streamed requests | `flink_service/fraud_detection.py` |
+| Flink Fraud Starter | Current clean-by-default stream gate; rules will be added one by one | `flink_service/fraud_detection.py` |
 | RFC Scoring Service | Score suspicious requests with the offline-trained model | Planned in `scoring_service/` |
 | Moderation Service | Call the moderation provider and forward approved requests | `pipeline_consumers/moderation_consumer.py` |
 | Ad Injection Consumer | Consume fully approved requests | `pipeline_consumers/ad_injection_consumer.py` |
-| Spark Analytics | Train models and aggregate long-term risk signals | `spark_service/spark_training.py` |
+| Spark Analytics | Not planned in detail yet | `spark_service/spark_training.py` |
 
 ## Architectural Characteristics
 
@@ -75,10 +112,10 @@ and historical aggregation.
 | Area | Current prototype note |
 | --- | --- |
 | Kafka usage | Target active topics are `requests.raw`, `requests.sus`, `requests.clean`, `requests.fraud`, and `ad.injection` |
-| Flink processing | Most advanced runtime component in the repository |
+| Flink processing | Reset to a small starter fraud gate for incremental cleanup |
 | RFC scoring service | Planned service for model-based suspicious request scoring |
 | Moderation service | Prototype exists with `.env` configuration and OpenAI-ready provider support |
-| Spark training | Initial offline training pipeline is present |
+| Spark training | Existing prototype is parked until a new plan is written |
 
 ## Future Agents Guidance
 
