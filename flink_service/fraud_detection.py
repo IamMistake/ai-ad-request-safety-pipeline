@@ -19,9 +19,10 @@ from pyflink.datastream.connectors.kafka import (
 from flink_service.constants import (
     FRAUD_CONSUMER_GROUP,
     FRAUD_JOB_NAME,
-    FRAUD_VERDICTS_TOPIC,
     KAFKA_BOOTSTRAP,
-    MODERATION_REQUESTS_TOPIC,
+    REQUESTS_CLEAN_TOPIC,
+    REQUESTS_FRAUD_TOPIC,
+    REQUESTS_SUS_TOPIC,
     REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
     REQUEST_RAW_TOPIC,
     SESSION_WINDOW_GAP_SECONDS,
@@ -32,9 +33,11 @@ from flink_service.events import (
     extract_publisher_key,
     extract_publisher_session_key,
     extract_event_timestamp_ms,
+    has_verdict,
+    is_request_verdict,
     load_event,
-    should_forward_to_moderation,
-    verdict_to_moderation_request,
+    verdict_to_blocked_request,
+    verdict_to_routed_request,
 )
 from flink_service.publisher_profiler import PublisherProfiler
 from flink_service.session_analytics import (
@@ -72,17 +75,22 @@ def format_verdict_log_line(raw_value: str) -> str:
     if not isinstance(reasons, list):
         reasons = [str(reasons)]
 
-    target_topics = [FRAUD_VERDICTS_TOPIC]
-    if bool(verdict.get("forward_to_moderation", False)):
-        target_topics.append(MODERATION_REQUESTS_TOPIC)
+    if verdict_label == "CLEAN":
+        target_topic = REQUESTS_CLEAN_TOPIC
+    elif verdict_label == "SUSPICIOUS":
+        target_topic = REQUESTS_SUS_TOPIC
+    else:
+        target_topic = REQUESTS_FRAUD_TOPIC
 
     if reasons:
         return (
             f"[flink-fraud] {verdict_label} req_id={req_id} "
-            f"score={score} reasons={json.dumps(reasons)} -> {', '.join(target_topics)}"
+            f"score={score} reasons={json.dumps(reasons)} -> {target_topic}"
         )
 
-    return f"[flink-fraud] {verdict_label} req_id={req_id} score={score} -> {', '.join(target_topics)}"
+    return (
+        f"[flink-fraud] {verdict_label} req_id={req_id} score={score} -> {target_topic}"
+    )
 
 
 def build_kafka_sink(topic: str) -> KafkaSink:
@@ -123,7 +131,7 @@ def main() -> None:
 
     print(
         "flink-fraud processor started: "
-        f"{REQUEST_RAW_TOPIC} -> {FRAUD_VERDICTS_TOPIC} (+ {MODERATION_REQUESTS_TOPIC} for approved requests)"
+        f"{REQUEST_RAW_TOPIC} -> {REQUESTS_CLEAN_TOPIC}/{REQUESTS_SUS_TOPIC}/{REQUESTS_FRAUD_TOPIC}"
     )
 
     request_stream = env.from_source(
@@ -167,16 +175,24 @@ def main() -> None:
         )
     )
 
-    verdict_stream = profiled.union(session_summaries)
+    request_verdicts = profiled.filter(is_request_verdict)
 
-    verdict_stream.sink_to(build_kafka_sink(FRAUD_VERDICTS_TOPIC))
-
-    profiled.filter(should_forward_to_moderation).map(
-        verdict_to_moderation_request,
+    request_verdicts.filter(lambda raw: has_verdict(raw, "clean")).map(
+        verdict_to_routed_request,
         output_type=Types.STRING(),
-    ).sink_to(build_kafka_sink(MODERATION_REQUESTS_TOPIC))
+    ).sink_to(build_kafka_sink(REQUESTS_CLEAN_TOPIC))
 
-    verdict_stream.map(
+    request_verdicts.filter(lambda raw: has_verdict(raw, "suspicious")).map(
+        verdict_to_routed_request,
+        output_type=Types.STRING(),
+    ).sink_to(build_kafka_sink(REQUESTS_SUS_TOPIC))
+
+    request_verdicts.filter(lambda raw: has_verdict(raw, "fraud")).map(
+        verdict_to_blocked_request,
+        output_type=Types.STRING(),
+    ).sink_to(build_kafka_sink(REQUESTS_FRAUD_TOPIC))
+
+    request_verdicts.map(
         format_verdict_log_line,
         output_type=Types.STRING(),
     ).filter(lambda line: bool(line)).print()

@@ -1,8 +1,7 @@
-import copy
 import json
 from datetime import datetime
 
-from flink_service.constants import FORWARD_SUSPICIOUS_TO_MODERATION
+from shared.events import add_fraud_context, build_blocked_event
 
 
 def load_event(raw_value: str) -> dict:
@@ -67,31 +66,39 @@ def extract_publisher_session_key(raw_value: str) -> str:
     return f"{publisher_id}|{session_id}"
 
 
-def should_forward_to_moderation(verdict_raw: str) -> bool:
+def is_request_verdict(verdict_raw: str) -> bool:
     verdict = load_event(verdict_raw)
-    if verdict.get("record_type") != "request_verdict":
-        return False
-
-    verdict_label = str(verdict.get("verdict", "clean")).strip().lower()
-    if verdict_label == "clean":
-        return True
-    if verdict_label == "suspicious":
-        return FORWARD_SUSPICIOUS_TO_MODERATION
-    return False
+    return verdict.get("record_type") == "request_verdict"
 
 
-def verdict_to_moderation_request(verdict_raw: str) -> str:
+def has_verdict(verdict_raw: str, expected: str) -> bool:
+    verdict = load_event(verdict_raw)
+    return str(verdict.get("verdict", "")).strip().lower() == expected
+
+
+def verdict_to_routed_request(verdict_raw: str) -> str:
     verdict = load_event(verdict_raw)
     request = verdict.get("request")
     if not isinstance(request, dict):
         request = {}
 
-    forwarded_request = copy.deepcopy(request)
-    forwarded_request["fraud_context"] = {
-        "verdict": verdict.get("verdict"),
-        "fraud_score": verdict.get("fraud_score", 0.0),
-        "reasons": verdict.get("reasons", []),
-        "ip_hash": verdict.get("ip_hash"),
-        "ua_hash": verdict.get("ua_hash"),
-    }
-    return json.dumps(forwarded_request)
+    routed = add_fraud_context(
+        request,
+        verdict.get("verdict", "clean"),
+        verdict.get("fraud_score", 0.0),
+        verdict.get("reasons", []),
+    )
+    return json.dumps(routed)
+
+
+def verdict_to_blocked_request(verdict_raw: str) -> str:
+    enriched = json.loads(verdict_to_routed_request(verdict_raw))
+    fraud = enriched.get("fraud", {})
+    blocked = build_blocked_event(
+        enriched,
+        "flink",
+        "fraud",
+        fraud.get("score", 0.0),
+        fraud.get("reasons", []),
+    )
+    return json.dumps(blocked)
