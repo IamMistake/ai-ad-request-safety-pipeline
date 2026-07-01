@@ -23,9 +23,9 @@ from flink_service.constants import (
     KAFKA_BOOTSTRAP,
     REQUESTS_CLEAN_TOPIC,
     REQUESTS_FRAUD_TOPIC,
+    REQUESTS_RAW_TOPIC,
     REQUESTS_SUS_TOPIC,
     REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
-    REQUEST_RAW_TOPIC,
 )
 from flink_service.events import extract_event_timestamp_ms, load_event
 from shared.events import add_fraud_context, build_blocked_event
@@ -84,7 +84,7 @@ def route_key(routed_value: str) -> str:
         if verdict in {"clean", "suspicious", "fraud"}:
             return verdict
 
-    return "fraud"
+    return "clean"
 
 
 def format_log_line(routed_value: str) -> str:
@@ -155,11 +155,11 @@ def main() -> None:
 
     print(
         "flink-fraud starter started: "
-        f"{REQUEST_RAW_TOPIC} -> {REQUESTS_CLEAN_TOPIC}/{REQUESTS_SUS_TOPIC}/{REQUESTS_FRAUD_TOPIC}"
+        f"{REQUESTS_RAW_TOPIC} -> {REQUESTS_CLEAN_TOPIC}/{REQUESTS_SUS_TOPIC}/{REQUESTS_FRAUD_TOPIC}"
     )
 
     request_stream = env.from_source(
-        build_kafka_source(REQUEST_RAW_TOPIC),
+        build_kafka_source(REQUESTS_RAW_TOPIC),
         watermark_strategy=WatermarkStrategy.no_watermarks(),
         source_name="Flink Fraud Request Source",
     )

@@ -16,8 +16,8 @@ try:
         AD_INJECTION_TOPIC,
         KAFKA_API_VERSION,
         KAFKA_BOOTSTRAP,
-        MODERATION_REQUESTS_TOPIC,
-        MODERATION_VERDICTS_TOPIC,
+        REQUESTS_CLEAN_TOPIC,
+        REQUESTS_FRAUD_TOPIC,
     )
     from .moderation_rules import ModerationAnalyzer, normalize_prompt_text
 except ImportError:
@@ -25,8 +25,8 @@ except ImportError:
         AD_INJECTION_TOPIC,
         KAFKA_API_VERSION,
         KAFKA_BOOTSTRAP,
-        MODERATION_REQUESTS_TOPIC,
-        MODERATION_VERDICTS_TOPIC,
+        REQUESTS_CLEAN_TOPIC,
+        REQUESTS_FRAUD_TOPIC,
     )
     from moderation_rules import ModerationAnalyzer, normalize_prompt_text
 
@@ -148,7 +148,7 @@ def build_forwarded_request(event: dict, analysis: dict) -> dict:
 def main() -> None:
     client = ModerationClient()
     consumer = KafkaConsumer(
-        MODERATION_REQUESTS_TOPIC,
+        REQUESTS_CLEAN_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
         api_version=KAFKA_API_VERSION,
         auto_offset_reset="latest",
@@ -165,7 +165,7 @@ def main() -> None:
 
     print(
         "moderation-detection consumer started: "
-        f"{MODERATION_REQUESTS_TOPIC} -> {MODERATION_VERDICTS_TOPIC} -> {AD_INJECTION_TOPIC} for clean requests"
+        f"{REQUESTS_CLEAN_TOPIC} -> {REQUESTS_FRAUD_TOPIC} -> {AD_INJECTION_TOPIC} for clean requests"
     )
 
     sent_since_flush = 0
@@ -210,7 +210,7 @@ def main() -> None:
                     "cache_hit": bool(analysis.get("cache_hit", False)),
                 }
 
-                producer.send(MODERATION_VERDICTS_TOPIC, verdict_event)
+                producer.send(REQUESTS_FRAUD_TOPIC, verdict_event)
                 sent_since_flush += 1
 
                 if verdict == "clean":
@@ -219,12 +219,12 @@ def main() -> None:
                     print(
                         f"[moderation-detection] CLEAN req_id={req_id} "
                         f"provider={analysis.get('provider', client.provider)} cache_hit={analysis.get('cache_hit', False)} "
-                        f"-> {MODERATION_VERDICTS_TOPIC}, {AD_INJECTION_TOPIC}"
+                        f"-> {REQUESTS_FRAUD_TOPIC}, {AD_INJECTION_TOPIC}"
                     )
                 else:
                     print(
                         f"[moderation-detection] FLAGGED req_id={req_id} "
-                        f"score={moderation_score} -> {MODERATION_VERDICTS_TOPIC}"
+                        f"score={moderation_score} -> {REQUESTS_FRAUD_TOPIC}"
                     )
 
                 if sent_since_flush >= PRODUCER_FLUSH_INTERVAL:
