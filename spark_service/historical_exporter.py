@@ -12,18 +12,18 @@ if str(ROOT_DIR) not in sys.path:
 
 from pipeline_consumers.constants import (
     AD_INJECTION_TOPIC,
-    FRAUD_VERDICTS_TOPIC,
     KAFKA_API_VERSION,
     KAFKA_BOOTSTRAP,
-    MODERATION_REQUESTS_TOPIC,
-    MODERATION_VERDICTS_TOPIC,
-    REQUEST_RAW_TOPIC,
+    REQUESTS_CLEAN_TOPIC,
+    REQUESTS_FRAUD_TOPIC,
+    REQUESTS_RAW_TOPIC,
 )
 
 
-REQUEST_TOPIC = REQUEST_RAW_TOPIC
-FRAUD_TOPIC = FRAUD_VERDICTS_TOPIC
-MODERATION_TOPIC = MODERATION_VERDICTS_TOPIC
+REQUEST_TOPIC = REQUESTS_RAW_TOPIC
+FRAUD_TOPIC = REQUESTS_FRAUD_TOPIC
+MODERATION_REQUEST_TOPIC = REQUESTS_CLEAN_TOPIC
+MODERATION_TOPIC = REQUESTS_FRAUD_TOPIC
 APPROVED_TOPIC = AD_INJECTION_TOPIC
 
 
@@ -149,7 +149,7 @@ def export_historical_logs(args: argparse.Namespace) -> None:
     consumer = KafkaConsumer(
         REQUEST_TOPIC,
         FRAUD_TOPIC,
-        MODERATION_REQUESTS_TOPIC,
+        MODERATION_REQUEST_TOPIC,
         MODERATION_TOPIC,
         APPROVED_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
@@ -166,7 +166,7 @@ def export_historical_logs(args: argparse.Namespace) -> None:
 
     print(
         "Spark historical exporter started: "
-        f"[{REQUEST_TOPIC}, {FRAUD_TOPIC}, {MODERATION_REQUESTS_TOPIC}, {MODERATION_TOPIC}, {APPROVED_TOPIC}] -> {output_path}"
+        f"[{REQUEST_TOPIC}, {FRAUD_TOPIC}, {MODERATION_REQUEST_TOPIC}, {MODERATION_TOPIC}, {APPROVED_TOPIC}] -> {output_path}"
     )
 
     with output_path.open("a", encoding="utf-8") as out:
