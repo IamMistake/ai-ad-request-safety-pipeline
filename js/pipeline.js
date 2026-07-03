@@ -55,20 +55,19 @@
 
       var html = '';
       if (data.planned) {
-        html += '<div class="badge badge-planned" style="margin-bottom:12px;display:inline-block">Planned</div>';
+        html += '<span class="badge badge-planned" style="margin-bottom:12px;display:inline-block">Planned</span>';
       }
-      html += '<h3 style="font-size:1.1rem;font-weight:600;margin-bottom:8px">' + data.title + '</h3>';
-      html += '<p style="color:var(--text-secondary);font-size:0.9rem;line-height:1.7">' + data.desc + '</p>';
+      html += '<h3 style="font-size:1.05rem;font-weight:700;margin-bottom:8px;color:var(--rm-ink)">' + data.title + '</h3>';
+      html += '<p style="color:var(--rm-sub);font-size:0.9rem;line-height:1.7">' + data.desc + '</p>';
       if (data.file) {
-        html += '<p style="margin-top:10px;font-size:0.8rem;color:var(--text-muted)">';
+        html += '<p style="margin-top:10px;font-size:0.82rem;color:#94a3b8">';
         html += '<code style="font-family:var(--font-mono)">' + data.file + '</code>';
         html += '</p>';
       }
       if (data.rules) {
-        html += '<p style="margin-top:4px;font-size:0.8rem;color:var(--accent-teal)">' + data.rules + '</p>';
+        html += '<p style="margin-top:4px;font-size:0.82rem;color:var(--rm-primary-soft);font-weight:600">' + data.rules + '</p>';
       }
       detailEl.innerHTML = html;
-      detailEl.style.borderColor = 'rgba(255,255,255,0.15)';
     });
   });
 

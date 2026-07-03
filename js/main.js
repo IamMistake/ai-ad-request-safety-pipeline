@@ -1,59 +1,85 @@
 // ============================================================
-// Main JS — Scroll animations, nav toggle, Intersection Observer
+// Main JS — TOC toggle, active tracking, scroll fade-in
 // ============================================================
 
 (function () {
   'use strict';
 
-  // --- Mobile Nav Toggle ---
-  const navToggle = document.querySelector('.nav-toggle');
-  const navLinks = document.querySelector('.nav-links');
+  // --- TOC toggle ---
+  var tocRail = document.getElementById('toc-rail');
+  var tocToggle = document.getElementById('toc-toggle');
+  var tocLinks = document.getElementById('toc-links');
 
-  if (navToggle && navLinks) {
-    navToggle.addEventListener('click', function () {
-      const expanded = this.getAttribute('aria-expanded') === 'true';
-      this.setAttribute('aria-expanded', !expanded);
-      navLinks.classList.toggle('open');
-    });
-
-    // Close nav on link click
-    navLinks.querySelectorAll('a').forEach(function (link) {
-      link.addEventListener('click', function () {
-        navToggle.setAttribute('aria-expanded', 'false');
-        navLinks.classList.remove('open');
-      });
+  if (tocRail && tocToggle) {
+    tocToggle.addEventListener('click', function () {
+      tocRail.classList.toggle('is-collapsed');
     });
   }
 
-  // --- Sticky nav background on scroll ---
-  const nav = document.getElementById('site-nav');
-  if (nav) {
-    window.addEventListener('scroll', function () {
-      if (window.scrollY > 50) {
-        nav.style.background = 'rgba(10, 10, 15, 0.95)';
-      } else {
-        nav.style.background = 'rgba(10, 10, 15, 0.85)';
+  // --- TOC active section tracking (IntersectionObserver) ---
+  if (tocLinks && 'IntersectionObserver' in window) {
+    var links = tocLinks.querySelectorAll('.toc-link');
+    var sections = [];
+    links.forEach(function (link) {
+      var href = link.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        var section = document.getElementById(href.substring(1));
+        if (section) sections.push({ el: section, link: link });
       }
-    }, { passive: true });
+    });
+
+    if (sections.length > 0) {
+      var observer = new IntersectionObserver(function () {
+        var current = null;
+        var currentTop = Infinity;
+
+        sections.forEach(function (item) {
+          var rect = item.el.getBoundingClientRect();
+          // Find the section closest to the top of viewport (or just above it)
+          if (rect.top <= 200 && rect.top < currentTop) {
+            currentTop = rect.top;
+            current = item;
+          }
+        });
+
+        sections.forEach(function (item) {
+          item.link.classList.remove('is-active');
+        });
+        if (current) {
+          current.link.classList.add('is-active');
+        }
+      }, {
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+        rootMargin: '-80px 0px -50% 0px'
+      });
+
+      sections.forEach(function (item) {
+        observer.observe(item.el);
+      });
+    }
   }
 
   // --- Intersection Observer for fade-in animations ---
-  function observeSections() {
-    const elements = document.querySelectorAll('.section, .hero-metrics, .problem-grid, .steps, .pipeline-container, .rules-explorer, .results-showcase, .status-grid, .quickstart-steps, .spark-details, .data-grid');
+  function observeFadeIn() {
+    var elements = document.querySelectorAll(
+      '.pillars, .flow-steps, .pipeline-container, .rules-explorer, ' +
+      '.results-grid, .status-grid, .quickstart-steps, .spark-grid, ' +
+      '.data-sources, .fraud-table-wrap, .abstract-box, .metrics-strip, ' +
+      '.flink-diagram, .spark-diagram'
+    );
 
     elements.forEach(function (el) {
       el.classList.add('fade-in');
     });
 
     if (!('IntersectionObserver' in window)) {
-      // Fallback: show all
       document.querySelectorAll('.fade-in').forEach(function (el) {
         el.classList.add('visible');
       });
       return;
     }
 
-    const observer = new IntersectionObserver(function (entries) {
+    var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add('visible');
@@ -83,22 +109,40 @@
         remaining -= 1;
         if (remaining === 0) callback();
       });
-      // If already loaded or fails, count it
       if (obj.contentDocument || obj.type === 'failed') {
         remaining -= 1;
       }
     });
-    // Fallback timeout
     setTimeout(callback, 1500);
   }
 
-  // Wait for DOM + SVGs before observing
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      waitForSvgs(observeSections);
+      waitForSvgs(observeFadeIn);
     });
   } else {
-    waitForSvgs(observeSections);
+    waitForSvgs(observeFadeIn);
+  }
+
+  // --- BibTeX copy button ---
+  var bibBtn = document.getElementById('bibtex-copy');
+  if (bibBtn) {
+    bibBtn.addEventListener('click', function () {
+      var pre = this.parentElement.querySelector('pre');
+      if (pre) {
+        var text = pre.textContent || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text.trim()).then(function () {
+            bibBtn.innerHTML = '<i class="fa-regular fa-check-circle"></i> Copied!';
+            bibBtn.classList.add('copied');
+            setTimeout(function () {
+              bibBtn.innerHTML = '<i class="fa-regular fa-clipboard"></i> Copy';
+              bibBtn.classList.remove('copied');
+            }, 2000);
+          });
+        }
+      }
+    });
   }
 
 })();
