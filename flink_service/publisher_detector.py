@@ -8,14 +8,13 @@ from flink_service.constants import (
     PUBLISHER_BAD_UA_RATE_MIN_REQUESTS,
     PUBLISHER_BAD_UA_RATE_SCORE,
     PUBLISHER_BAD_UA_RATE_THRESHOLD,
-    PUBLISHER_BAD_UA_RATE_WINDOW_SECONDS,
     PUBLISHER_BURST_MAX_REQUESTS,
     PUBLISHER_BURST_SCORE,
     PUBLISHER_BURST_WINDOW_SECONDS,
+    PUBLISHER_RATE_WINDOW_SECONDS,
     PUBLISHER_SUSPICIOUS_RATE_MIN_REQUESTS,
     PUBLISHER_SUSPICIOUS_RATE_SCORE,
     PUBLISHER_SUSPICIOUS_RATE_THRESHOLD,
-    PUBLISHER_SUSPICIOUS_RATE_WINDOW_SECONDS,
 )
 from flink_service.events import (
     extract_raw_request_timestamp_ms,
@@ -35,7 +34,9 @@ def _is_bad_user_agent(user_agent: str) -> bool:
     return False
 
 
-def _recent_observations(state, timestamp_ms: int, window_seconds: int) -> list[tuple[int, bool, bool]]:
+def _recent_observations(
+    state, timestamp_ms: int, window_seconds: int
+) -> list[tuple[int, bool, bool]]:
     window_start_ms = timestamp_ms - (window_seconds * 1000)
     observations = []
 
@@ -103,12 +104,11 @@ class PublisherFraudDetector(KeyedProcessFunction):
             reasons.append("publisher_burst")
 
         # --- publisher_suspicious_rate & publisher_bad_ua_rate ---
-        rate_window = PUBLISHER_SUSPICIOUS_RATE_WINDOW_SECONDS
         was_flagged_by_prior = len(result.stateful_reasons) > 0
         is_bad_ua = _is_bad_user_agent(request.request_context.user_agent)
 
         observations = _recent_observations(
-            self.recent_observations, event_timestamp_ms, rate_window
+            self.recent_observations, event_timestamp_ms, PUBLISHER_RATE_WINDOW_SECONDS
         )
         observations.append((event_timestamp_ms, was_flagged_by_prior, is_bad_ua))
         self.recent_observations.update(
