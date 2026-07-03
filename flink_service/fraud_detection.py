@@ -31,10 +31,12 @@ from flink_service.constants import (
 )
 from flink_service.events import (
     extract_event_timestamp_ms,
+    extract_publisher_id_key,
     extract_session_id_key,
     extract_user_ip_key,
     load_event,
 )
+from flink_service.publisher_detector import PublisherFraudDetector
 from flink_service.rules import apply_rules
 from flink_service.session_detector import SessionFraudDetector
 from flink_service.user_detector import UserFraudDetector
@@ -203,7 +205,15 @@ def main() -> None:
         SessionFraudDetector(),
         output_type=Types.STRING(),
     )
-    routed = session_detection_results.map(route_request, output_type=Types.STRING())
+    publisher_detection_results = session_detection_results.key_by(
+        extract_publisher_id_key
+    ).process(
+        PublisherFraudDetector(),
+        output_type=Types.STRING(),
+    )
+    routed = publisher_detection_results.map(
+        route_request, output_type=Types.STRING()
+    )
 
     routed.filter(lambda raw: route_key(raw) == "clean").sink_to(
         build_kafka_sink(REQUESTS_CLEAN_TOPIC)

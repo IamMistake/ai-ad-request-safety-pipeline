@@ -56,6 +56,25 @@ def extract_user_ip_key(raw_value: str) -> str:
     return "unknown_ip"
 
 
+def get_publisher_id(request: RawRequestEvent) -> str:
+    return request.publisher_id.strip()
+
+
+def extract_publisher_id_key(raw_value: str) -> str:
+    event = load_event(raw_value)
+    if "_parse_error" in event:
+        return "unknown_publisher"
+
+    raw_request = event.get("raw_request")
+    if isinstance(raw_request, dict):
+        event = raw_request
+
+    publisher_id = get_publisher_id(RawRequestEvent.from_dict(event))
+    if publisher_id:
+        return publisher_id
+    return "unknown_publisher"
+
+
 def extract_session_id_key(raw_value: str) -> str:
     event = load_event(raw_value)
     if "_parse_error" in event:

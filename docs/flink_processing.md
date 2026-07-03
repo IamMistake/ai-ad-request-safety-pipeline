@@ -19,6 +19,7 @@ profiler, and session analytics stages were removed.
 | `flink_service/fraud_detection.py` | Flink job wiring, score verdicts, routing, and Kafka sinks |
 | `flink_service/user_detector.py` | User/IP scoped stateful rules, currently IP burst |
 | `flink_service/session_detector.py` | Session scoped stateful rules |
+| `flink_service/publisher_detector.py` | Publisher scoped stateful rules |
 | `flink_service/rules.py` | Stateless request scoring rules |
 | `flink_service/events.py` | JSON parsing and event/object extraction helpers |
 | `flink_service/constants.py` | Flink thresholds and Kafka constants |
@@ -33,10 +34,12 @@ flowchart LR
     C --> D[UserFraudDetector]
     D --> E[Key by session_id]
     E --> F[SessionFraudDetector]
-    F --> G{score verdict}
-    G --> H[requests.clean]
-    G --> I[requests.sus]
-    G --> J[requests.fraud]
+    F --> G[Key by publisher_id]
+    G --> H[PublisherFraudDetector]
+    H --> I{score verdict}
+    I --> J[requests.clean]
+    I --> K[requests.sus]
+    I --> L[requests.fraud]
 ```
 
 ## Current Rule Set
@@ -53,6 +56,9 @@ rule set is intentionally small and incremental.
 | Session ASN churn | `session_id` | At least 2 unique ASNs in 120 seconds adds `0.4` and reason `session_asn_churn` |
 | Prompt replay | `session_id` | Same or at least 90% similar normalized prompt in 300 seconds adds `0.4` and reason `prompt_replay` |
 | Regular cadence | `session_id` | Last 4 request intervals differ by no more than 250ms and add `0.3` with reason `regular_cadence` |
+| Publisher burst | `publisher_id` | More than 100 requests in 60 seconds adds `0.3` and reason `publisher_burst` |
+| Publisher suspicious rate | `publisher_id` | At least 20 requests with >5% flagged by prior detectors in 600 seconds adds `0.3` and reason `publisher_suspicious_rate` |
+| Publisher bad UA rate | `publisher_id` | At least 30 requests with >10% bad or empty user-agents in 600 seconds adds `0.3` and reason `publisher_bad_ua_rate` |
 | Negative prompt | request | Matching negative-language pattern adds `0.2` and reason `negative_prompt` |
 | Bad user-agent | request | Automated/headless user-agent patterns add `0.2` and reason `bad_user_agent` |
 | ASN risk | request | ASN in the local high-risk ASN denylist adds `0.2` and reason `asn_risk` |
