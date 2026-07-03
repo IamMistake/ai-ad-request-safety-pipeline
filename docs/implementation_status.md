@@ -45,7 +45,7 @@ Request Simulator
 5. Key detection results by `request_context.session_id`.
 6. Apply `SessionFraudDetector` stateful session burst scoring.
 7. Key detection results by `publisher_id`.
-8. Apply `PublisherFraudDetector` stateful publisher burst scoring.
+8. Apply `PublisherFraudDetector` stateful publisher scoring.
 9. Build typed fraud context with `shared.schemas.FraudContext`.
 10. Route `clean` to `requests.clean`, `suspicious` to `requests.sus`, and `fraud` to `requests.fraud`.
 
