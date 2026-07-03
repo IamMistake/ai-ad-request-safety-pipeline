@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Real-time fraud detection and moderation pipeline for AI advertising systems. University project for Massive Data Mining.">
+  <title>Request Fraud & Moderation Detection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ====== NAV ====== -->
+  <nav class="site-nav" id="site-nav" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">Fraud Detection Pipeline</a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links">
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#fraud-detection">Fraud Detection</a></li>
+        <li><a href="#moderation">Moderation</a></li>
+        <li><a href="#spark">Spark &amp; ML</a></li>
+        <li><a href="#results">Results</a></li>
+        <li><a href="#status">Status</a></li>
+        <li><a href="#quickstart">Quick Start</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ====== HERO ====== -->
+  <section id="hero" class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-tag">Massive Data Mining &middot; University Project</div>
+      <h1 class="hero-title">Request Fraud &amp; <span class="text-accent">Moderation Detection</span></h1>
+      <p class="hero-subtitle">
+        A streaming pipeline that detects ad request fraud and moderates unsafe content
+        in real-time using Apache Kafka, Flink, and Spark.
+      </p>
+      <div class="hero-actions">
+        <a href="#architecture" class="btn btn-primary">Explore the Pipeline</a>
+        <a href="https://github.com/IamMistake/request-fraud-and-moderation-detection" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+      <div class="hero-metrics">
+        <div class="metric-card">
+          <span class="metric-value">14</span>
+          <span class="metric-label">Fraud Detection Rules</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">5</span>
+          <span class="metric-label">Kafka Topics</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">175k</span>
+          <span class="metric-label">Dataset Rows</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">2k</span>
+          <span class="metric-label">Pipeline Test</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== PROBLEM ====== -->
+  <section id="problem" class="section">
+    <div class="section-inner">
+      <h2 class="section-title">The Problem</h2>
+      <p class="section-desc">
+        AI-powered platforms are increasingly injecting sponsored content into their responses.
+        This creates a new attack surface: bad actors can craft requests that exploit the ad
+        injection mechanism &mdash; committing fraud, gaming the system, or injecting unsafe content.
+      </p>
+      <div class="problem-grid">
+        <div class="problem-card">
+          <div class="problem-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h3>Ad Fraud</h3>
+          <p>Burst traffic, bot-generated requests, and IP/proxy churn designed to extract value from the monetization layer.</p>
+        </div>
+        <div class="problem-card">
+          <div class="problem-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h3>Unsafe Content</h3>
+          <p>Manipulative, toxic, or policy-violating prompts that should never reach the ad injection stage.</p>
+        </div>
+        <div class="problem-card">
+          <div class="problem-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h3>Real-Time Scale</h3>
+          <p>Fraud decisions must happen in-stream with low latency &mdash; batch analysis after the fact is too late.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== ARCHITECTURE ====== -->
+  <section id="architecture" class="section section-dark">
+    <div class="section-inner">
+      <h2 class="section-title">Architecture</h2>
+      <p class="section-desc">
+        The pipeline evaluates every request through multiple defense layers before it reaches ad injection.
+        Flink provides real-time analysis, moderation checks content safety, and Spark trains better models offline.
+      </p>
+
+      <div class="pipeline-container">
+        <figure class="pipeline-figure">
+          <object type="image/svg+xml" data="assets/diagrams/pipeline.svg" class="pipeline-svg" aria-label="Architecture pipeline diagram showing the full data flow from Request Simulator through Kafka, Flink, RFC Scoring, Moderation, Ad Injection, and Spark."></object>
+        </figure>
+        <div class="pipeline-legend">
+          <button class="legend-item" data-component="simulator"><span class="legend-dot" style="--dot-color:#14b8a6"></span> Request Simulator</button>
+          <button class="legend-item" data-component="kafka"><span class="legend-dot" style="--dot-color:#f59e0b"></span> Kafka Topics</button>
+          <button class="legend-item" data-component="flink"><span class="legend-dot" style="--dot-color:#06b6d4"></span> Flink Fraud</button>
+          <button class="legend-item" data-component="rfc"><span class="legend-dot" style="--dot-color:#a855f7"></span> RFC Scoring</button>
+          <button class="legend-item" data-component="moderation"><span class="legend-dot" style="--dot-color:#f43f5e"></span> Moderation</button>
+          <button class="legend-item" data-component="spark"><span class="legend-dot" style="--dot-color:#8b5cf6"></span> Spark Training</button>
+        </div>
+      </div>
+
+      <div class="component-detail" id="component-detail">
+        <p class="component-detail-empty">Click a pipeline component above to learn more.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== HOW IT WORKS ====== -->
+  <section id="how-it-works" class="section">
+    <div class="section-inner">
+      <h2 class="section-title">How It Works</h2>
+      <p class="section-desc">A request&rsquo;s journey through the pipeline &mdash; step by step.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-number" style="--step-color:#14b8a6">1</div>
+          <div class="step-content">
+            <h3>Request Simulator</h3>
+            <p>Generates synthetic ad request traffic from real conversation data (WildChat dataset, 175k prompts). Each request includes a prompt, session context, user agent, IP, country, and ASN. Supports <code>normal</code> and <code>fraud</code> traffic profiles.</p>
+            <pre><code class="language-json">{
+  "event_time": "2023-04-10T00:01:08+00:00",
+  "req_id": "5e87cd8f53dff5e7",
+  "prompt": "Write a very long...",
+  "language": "English",
+  "request_context": {
+    "session_id": "conv-id",
+    "user_agent": "Mozilla/5.0",
+    "user_ip": "158.37.13.4"
+  },
+  "optional_context": {
+    "country": "NO",
+    "asn": 64512
+  },
+  "publisher_id": "conv-id"
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number" style="--step-color:#f59e0b">2</div>
+          <div class="step-content">
+            <h3>Kafka Event Stream</h3>
+            <p>Requests flow through five Kafka topics: <code>requests.raw</code> (ingress), <code>requests.sus</code> (suspicious), <code>requests.clean</code> (fraud-clean), <code>requests.fraud</code> (blocked), and <code>ad.injection</code> (approved). Kafka decouples all pipeline stages.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number" style="--step-color:#06b6d4">3</div>
+          <div class="step-content">
+            <h3>Flink Fraud Detection</h3>
+            <p>Consumes <code>requests.raw</code>, assigns event-time watermarks, then keys the stream through three stateful detectors: User &rarr; Session &rarr; Publisher. Each detector applies rules and accumulates a fraud score.</p>
+            <pre><code class="language-text">score &lt; 0.5        &rarr; requests.clean (pass through)
+0.5 &le; score &lt; 0.8 &rarr; requests.sus   (RFC scoring)
+score &ge; 0.8        &rarr; requests.fraud (blocked)</code></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number" style="--step-color:#a855f7">4</div>
+          <div class="step-content">
+            <h3>RFC Scoring <span class="badge badge-planned">Planned</span></h3>
+            <p>Consumes <code>requests.sus</code>, applies the Spark-trained RandomForest model to score suspicious requests. Cleared requests go to <code>requests.clean</code>; confirmed fraud goes to <code>requests.fraud</code>.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number" style="--step-color:#f43f5e">5</div>
+          <div class="step-content">
+            <h3>Moderation</h3>
+            <p>Analyzes prompt content for safety. Two modes: <strong>mock</strong> (rule-based, great for local dev) and <strong>OpenAI</strong> (calls the OpenAI Moderation API). Prompt caching via SHA256 hash avoids redundant calls.</p>
+            <pre><code class="language-text">Mock mode:  keyword patterns + normalization checks
+OpenAI:     omni-moderation-latest API
+Clean &rarr; ad.injection  |  Unsafe &rarr; requests.fraud</code></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number" style="--step-color:#8b5cf6">6</div>
+          <div class="step-content">
+            <h3>Spark Analytics &amp; ML Training</h3>
+            <p>Exports historical logs from Kafka, runs batch analytics, and trains a RandomForestClassifier on features like scam keyword presence, ASN, and prior fraud score. Writes risk rollups and model artifacts for the RFC scoring service.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== FRAUD DETECTION ====== -->
+  <section id="fraud-detection" class="section section-dark">
+    <div class="section-inner">
+      <h2 class="section-title">Fraud Detection</h2>
+      <p class="section-desc">
+        Flink evaluates each request through 14 rules across three scopes. Rules are scored incrementally;
+        the final score determines whether the request is <strong>clean</strong>, <strong>suspicious</strong>, or <strong>fraud</strong>.
+      </p>
+
+      <figure class="flink-diagram">
+        <object type="image/svg+xml" data="assets/diagrams/flink-chain.svg" class="flink-svg" aria-label="Flink detector chain diagram showing UserDetector, SessionDetector, PublisherDetector in sequence."></object>
+      </figure>
+
+      <div class="rules-explorer" id="rules-explorer">
+        <h3>Rule Explorer</h3>
+        <p class="rules-desc">Toggle rules on/off to see their effect on the total fraud score.</p>
+        <div class="rules-controls">
+          <div class="rules-scope" data-scope="stateless">
+            <h4>Stateless Rules <span class="rule-count">(4)</span></h4>
+            <div class="rules-list" id="rules-stateless"></div>
+          </div>
+          <div class="rules-scope" data-scope="user">
+            <h4>User/IP Rules <span class="rule-count">(1)</span></h4>
+            <div class="rules-list" id="rules-user"></div>
+          </div>
+          <div class="rules-scope" data-scope="session">
+            <h4>Session Rules <span class="rule-count">(6)</span></h4>
+            <div class="rules-list" id="rules-session"></div>
+          </div>
+          <div class="rules-scope" data-scope="publisher">
+            <h4>Publisher Rules <span class="rule-count">(3)</span></h4>
+            <div class="rules-list" id="rules-publisher"></div>
+          </div>
+        </div>
+
+        <div class="rules-total" id="rules-total">
+          <span class="rules-total-label">Total Score:</span>
+          <span class="rules-total-value" id="total-score-value">0.0</span>
+        </div>
+        <div class="rules-verdict" id="rules-verdict">
+          <span class="verdict-badge">Clean</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== MODERATION ====== -->
+  <section id="moderation" class="section">
+    <div class="section-inner">
+      <h2 class="section-title">Moderation</h2>
+      <p class="section-desc">
+        The moderation service analyzes prompt content for safety before forwarding to ad injection.
+        It supports two provider modes.
+      </p>
+
+      <div class="tabs" id="moderation-tabs">
+        <div class="tab-nav" role="tablist" aria-label="Moderation modes">
+          <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-mock" id="tab-btn-mock">Mock Mode</button>
+          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-openai" id="tab-btn-openai">OpenAI Mode</button>
+        </div>
+        <div class="tab-panel active" id="tab-mock" role="tabpanel" aria-labelledby="tab-btn-mock">
+          <h3>Rule-Based Local Moderation</h3>
+          <p>Default mode for local development. Uses keyword patterns, normalization, and TF-IDF similarity to detect unsafe prompts. No external API calls &mdash; fast and repeatable.</p>
+          <pre><code class="language-bash"># No API key needed
+MODERATION_PROVIDER=mock
+
+# Uses ModerationAnalyzer with keyword rules
+# and TF-IDF gating against reference corpus</code></pre>
+        </div>
+        <div class="tab-panel" id="tab-openai" role="tabpanel" aria-labelledby="tab-btn-openai">
+          <h3>OpenAI Moderation API</h3>
+          <p>Calls the OpenAI Moderation API (<code>omni-moderation-latest</code>) for more accurate content safety checks. Requires an API key. Prompt caching avoids redundant calls.</p>
+          <pre><code class="language-bash"># Set in .env
+MODERATION_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODERATION_MODEL=omni-moderation-latest</code></pre>
+        </div>
+      </div>
+
+      <div class="moderation-flow">
+        <h3>Moderation Flow</h3>
+        <pre><code class="language-text">requests.clean &rarr; ModerationClient.analyze(prompt)
+                 |- Check cache (SHA256 normalized prompt)
+                 |- Mock/OpenAI analysis
+                 '- Route result
+                    |- Clean &rarr; ad.injection
+                    '- Unsafe &rarr; requests.fraud</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== SPARK & ML ====== -->
+  <section id="spark" class="section section-dark">
+    <div class="section-inner">
+      <h2 class="section-title">Spark Analytics &amp; ML</h2>
+      <p class="section-desc">
+        Spark processes historical export data to train fraud detection models and compute risk profiles.
+      </p>
+
+      <figure class="spark-diagram">
+        <object type="image/svg+xml" data="assets/diagrams/spark-flow.svg" class="spark-svg" aria-label="Spark training flow diagram."></object>
+      </figure>
+
+      <div class="spark-details">
+        <div class="spark-card">
+          <h3>Feature Engineering</h3>
+          <p>Three features for the RandomForest model:</p>
+          <ul>
+            <li><code>contains_scam</code> &mdash; Regex match against scam keywords</li>
+            <li><code>asn</code> &mdash; Autonomous System Number (network risk)</li>
+            <li><code>fraud_score_feature</code> &mdash; Prior Flink fraud score</li>
+          </ul>
+        </div>
+        <div class="spark-card">
+          <h3>Risk Rollups</h3>
+          <ul>
+            <li><code>ip_risk_scores.json</code> &mdash; Per-IP metrics</li>
+            <li><code>publisher_risk_scores.json</code> &mdash; Per-publisher</li>
+            <li><code>asn_risk_scores.json</code> &mdash; Per-ASN risk</li>
+            <li><code>session_risk_scores.json</code> &mdash; Per-session fraud</li>
+          </ul>
+        </div>
+        <div class="spark-card">
+          <h3>Model Artifacts</h3>
+          <ul>
+            <li><code>fraud_model.pkl</code> &mdash; Serialized RandomForest</li>
+            <li><code>model_metrics.json</code> &mdash; Accuracy + report</li>
+            <li><code>feature_columns.json</code> &mdash; Feature schema</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== DATA ====== -->
+  <section id="data" class="section">
+    <div class="section-inner">
+      <h2 class="section-title">Data &amp; Datasets</h2>
+      <p class="section-desc">The pipeline uses real conversation data for realistic traffic simulation and offline model training.</p>
+      <div class="data-grid">
+        <div class="data-card">
+          <h3>WildChat <span class="badge badge-source">Source</span></h3>
+          <p>175k real GPT conversations from April 2023. Provides prompt text, moderation labels, language (30+), and unique conversation IDs used as session/publisher identifiers.</p>
+          <div class="data-stat"><span>175,238</span> rows across 2 shards</div>
+        </div>
+        <div class="data-card">
+          <h3>GeoLite2 <span class="badge badge-source">Source</span></h3>
+          <p>MaxMind GeoIP databases for IP-to-location resolution. ~92% of random public IPv4s resolve to a country. Used for country-hop detection and language/country mismatch rules.</p>
+          <div class="data-stat"><span>City</span> + <span>Country</span> databases</div>
+        </div>
+        <div class="data-card">
+          <h3>Traffic Profiles</h3>
+          <p>Two traffic profiles: <code>normal</code> (realistic behavior) and <code>fraud</code> (bursts, bot patterns, suspicious IP churn).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== RESULTS ====== -->
+  <section id="results" class="section section-dark">
+    <div class="section-inner">
+      <h2 class="section-title">Pipeline Test Results</h2>
+      <p class="section-desc">
+        A 2,000-request end-to-end pipeline test with req_id correlation across all stages.
+      </p>
+      <div class="results-showcase">
+        <div class="result-chart">
+          <figure>
+            <object type="image/svg+xml" data="assets/graphs/verdict-distribution.svg" class="chart-svg" aria-label="Bar chart of verdict distribution."></object>
+          </figure>
+        </div>
+        <div class="result-table">
+          <table>
+            <thead>
+              <tr><th>Metric</th><th>Value</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Total requests sent</td><td>2,000</td></tr>
+              <tr><td>Allowed to ad injection</td><td>1,626</td></tr>
+              <tr><td>Denied before Flink (shallow)</td><td>374</td></tr>
+              <tr><td>Flink verdict: suspicious</td><td>1,240</td></tr>
+              <tr><td>Flink verdict: clean</td><td>386</td></tr>
+              <tr><td>Flink verdict: fraud</td><td>0</td></tr>
+              <tr><td>Session summaries</td><td>336</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="results-analysis">
+        <h3>Analysis</h3>
+        <ul>
+          <li>Shallow denials are mostly <code>ip_burst</code> combinations (especially with <code>suspicious_ua</code>).</li>
+          <li>Many sessions hit fallback IP <code>8.8.8.8</code>, inflating repeated-IP signals.</li>
+          <li>Flink marks as <code>suspicious</code> at any score above 0.5, so suspicious dominates.</li>
+          <li>No requests exceeded the 0.8 fraud threshold in this test run.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== STATUS ====== -->
+  <section id="status" class="section">
+    <div class="section-inner">
+      <h2 class="section-title">Implementation Status</h2>
+      <p class="section-desc">Current state of each pipeline component.</p>
+      <div class="status-grid">
+        <div class="status-card status-implemented">
+          <div class="status-icon">&#10003;</div>
+          <h3>Kafka Infrastructure</h3>
+          <p>Docker Compose with Zookeeper, Kafka broker, Kafka UI. Single-broker dev configuration.</p>
+          <span class="status-badge">Implemented</span>
+        </div>
+        <div class="status-card status-implemented">
+          <div class="status-icon">&#10003;</div>
+          <h3>Request Simulator</h3>
+          <p>Streams WildChat prompts through Kafka with geo enrichment. Supports normal/fraud profiles.</p>
+          <span class="status-badge">Implemented</span>
+        </div>
+        <div class="status-card status-implemented">
+          <div class="status-icon">&#10003;</div>
+          <h3>Flink Fraud Detection</h3>
+          <p>14 rules across user, session, and publisher scopes. Watermarking + keyed state.</p>
+          <span class="status-badge">Implemented</span>
+        </div>
+        <div class="status-card status-planned">
+          <div class="status-icon">&#9675;</div>
+          <h3>RFC Scoring Service</h3>
+          <p>Consumes <code>requests.sus</code>, loads Spark-trained model, scores suspicious requests. Not yet built.</p>
+          <span class="status-badge">Planned</span>
+        </div>
+        <div class="status-card status-implemented">
+          <div class="status-icon">&#10003;</div>
+          <h3>Moderation Service</h3>
+          <p>Mock and OpenAI modes. Prompt caching, TF-IDF gating, unsafe request blocking.</p>
+          <span class="status-badge">Implemented</span>
+        </div>
+        <div class="status-card status-implemented">
+          <div class="status-icon">&#10003;</div>
+          <h3>Spark Training</h3>
+          <p>RandomForest training, risk rollups, model serialization. Historical exporter prototype.</p>
+          <span class="status-badge">Implemented</span>
+        </div>
+        <div class="status-card status-planned">
+          <div class="status-icon">&#9675;</div>
+          <h3>Full Orchestration</h3>
+          <p>Automated pipeline startup, coordinated service management, end-to-end test suite.</p>
+          <span class="status-badge">Planned</span>
+        </div>
+        <div class="status-card status-planned">
+          <div class="status-icon">&#9675;</div>
+          <h3>Ad Injection Stage</h3>
+          <p>Placeholder consumer exists. Real ad-matching logic not implemented.</p>
+          <span class="status-badge">Planned</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== QUICK START ====== -->
+  <section id="quickstart" class="section section-dark">
+    <div class="section-inner">
+      <h2 class="section-title">Getting Started</h2>
+      <p class="section-desc">Run the full pipeline locally in a few steps.</p>
+      <div class="quickstart-steps">
+        <div class="qs-step">
+          <div class="qs-header"><span class="qs-label">Prerequisites</span></div>
+          <pre><code class="language-bash"># Python 3.10+
+# Docker + Docker Compose</code></pre>
+        </div>
+        <div class="qs-step">
+          <div class="qs-header"><span class="qs-label">1. Start infrastructure</span></div>
+          <pre><code class="language-bash">docker-compose up -d</code></pre>
+        </div>
+        <div class="qs-step">
+          <div class="qs-header"><span class="qs-label">2. Install dependencies</span></div>
+          <pre><code class="language-bash">pip install -r requirements.txt</code></pre>
+        </div>
+        <div class="qs-step">
+          <div class="qs-header"><span class="qs-label">3. Transform dataset</span></div>
+          <pre><code class="language-bash">python scripts/transform_wildchat_user_prompts.py</code></pre>
+        </div>
+        <div class="qs-step">
+          <div class="qs-header"><span class="qs-label">4. Run the pipeline</span></div>
+          <pre><code class="language-bash"># Terminal 1: Request simulator
+python kafka/producers/request_simulator.py
+
+# Terminal 2: Flink fraud detection
+python flink_service/fraud_detection.py
+
+# Terminal 3: Moderation consumer
+python pipeline_consumers/moderation_consumer.py
+
+# Terminal 4: Debug consumer
+python test_consumer.py</code></pre>
+        </div>
+        <div class="qs-step">
+          <div class="qs-header"><span class="qs-label">5. Run pipeline tests</span></div>
+          <pre><code class="language-bash">./scripts/test_full_pipeline.sh
+./scripts/test_fraud_block_flow.sh
+./scripts/test_moderation_block_flow.sh</code></pre>
+        </div>
+        <div class="qs-step">
+          <div class="qs-header"><span class="qs-label">6. Spark training</span></div>
+          <pre><code class="language-bash"># Export historical logs
+python spark_service/historical_exporter.py \
+  --from-beginning --idle-seconds 30
+
+# Run training
+python spark_service/spark_training.py</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== FOOTER ====== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-tech">
+        <span class="footer-label">Built with</span>
+        <div class="tech-badges">
+          <span class="tech-badge">Python</span>
+          <span class="tech-badge">Apache Kafka</span>
+          <span class="tech-badge">PyFlink</span>
+          <span class="tech-badge">PySpark</span>
+          <span class="tech-badge">scikit-learn</span>
+          <span class="tech-badge">Docker</span>
+        </div>
+      </div>
+      <p class="footer-credit">
+        Massive Data Mining &middot; University Project &middot;
+        <a href="https://github.com/IamMistake/request-fraud-and-moderation-detection" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+  <script src="js/tabs.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/pipeline.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
