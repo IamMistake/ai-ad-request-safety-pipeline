@@ -20,15 +20,28 @@ from pyflink.datastream.connectors.kafka import (
 from flink_service.constants import (
     FRAUD_CONSUMER_GROUP,
     FRAUD_JOB_NAME,
+    FRAUD_SCORE_THRESHOLD,
     KAFKA_BOOTSTRAP,
     REQUESTS_CLEAN_TOPIC,
     REQUESTS_FRAUD_TOPIC,
     REQUESTS_RAW_TOPIC,
     REQUESTS_SUS_TOPIC,
     REQUEST_WATERMARK_OUT_OF_ORDERNESS_SECONDS,
+    SUSPICIOUS_SCORE_THRESHOLD,
 )
-from flink_service.events import extract_event_timestamp_ms, load_event
-from shared.events import add_fraud_context, build_blocked_event
+from flink_service.events import (
+    extract_event_timestamp_ms,
+    extract_user_ip_key,
+    load_event,
+)
+from flink_service.rules import apply_rules
+from flink_service.user_detector import UserFraudDetector
+from shared.schemas import (
+    BlockedRequestEvent,
+    DetectionResult,
+    FraudContext,
+    FraudEnrichedRequestEvent,
+)
 
 
 class RequestTimestampAssigner(TimestampAssigner):
@@ -39,38 +52,46 @@ class RequestTimestampAssigner(TimestampAssigner):
         return event_timestamp_ms
 
 
-def detect_fraud(event: dict) -> tuple[str, float, list[str]]:
-    # ponytail: clean-by-default starter; add one rule here when needed.
-    return "clean", 0.0, []
+def verdict_for_score(score: float) -> str:
+    if score >= FRAUD_SCORE_THRESHOLD:
+        return "fraud"
+    if score >= SUSPICIOUS_SCORE_THRESHOLD:
+        return "suspicious"
+    return "clean"
 
 
-def route_request(raw_value: str) -> str:
-    event = load_event(raw_value)
-    if "_parse_error" in event:
+def route_request(detection_result_raw: str) -> str:
+    detection_result = load_event(detection_result_raw)
+    if "parse_error" in detection_result:
         return json.dumps(
-            build_blocked_event(
-                {"raw": raw_value},
-                "flink",
-                "fraud",
-                1.0,
-                [event["_parse_error"]],
-            )
+            {
+                "source": "flink",
+                "verdict": "fraud",
+                "score": 1.0,
+                "reasons": [detection_result["parse_error"]],
+                "request": {"raw": detection_result.get("raw_value", "")},
+            }
         )
 
-    verdict, score, reasons = detect_fraud(event)
-    verdict = str(verdict).strip().lower()
-    if verdict not in {"clean", "suspicious", "fraud"}:
-        verdict = "fraud"
-        score = 1.0
-        reasons = ["invalid_fraud_verdict"]
+    result = DetectionResult.from_dict(detection_result)
+    stateless_score, stateless_reasons = apply_rules(result.raw_request)
+    score = round(
+        max(0.0, min(float(stateless_score) + float(result.stateful_score), 1.0)),
+        3,
+    )
+    reasons = [*stateless_reasons, *result.stateful_reasons]
+    verdict = verdict_for_score(score)
 
-    enriched = add_fraud_context(event, verdict, score, reasons)
+    enriched = FraudEnrichedRequestEvent(
+        result.raw_request,
+        FraudContext(verdict=verdict, score=score, reasons=reasons),
+    )
 
     if verdict == "fraud":
-        blocked = build_blocked_event(enriched, "flink", "fraud", score, reasons)
-        return json.dumps(blocked)
+        blocked = BlockedRequestEvent("flink", "fraud", score, reasons, enriched)
+        return json.dumps(blocked.to_dict())
 
-    return json.dumps(enriched)
+    return json.dumps(enriched.to_dict())
 
 
 def route_key(routed_value: str) -> str:
@@ -170,7 +191,11 @@ def main() -> None:
         ).with_timestamp_assigner(RequestTimestampAssigner())
     )
 
-    routed = watermarked_requests.map(route_request, output_type=Types.STRING())
+    user_detection_results = watermarked_requests.key_by(extract_user_ip_key).process(
+        UserFraudDetector(),
+        output_type=Types.STRING(),
+    )
+    routed = user_detection_results.map(route_request, output_type=Types.STRING())
 
     routed.filter(lambda raw: route_key(raw) == "clean").sink_to(
         build_kafka_sink(REQUESTS_CLEAN_TOPIC)

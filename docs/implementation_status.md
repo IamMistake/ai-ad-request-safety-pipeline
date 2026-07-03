@@ -26,8 +26,8 @@ Request Simulator
 | Request simulator | Implemented prototype; publishes nested request events to `requests.raw` | `kafka/producers/request_simulator.py`, `kafka/producers/simulator_events.py` |
 | Shared topic constants | Implemented for active topics | `pipeline_consumers/constants.py` |
 | Debug consumer | Implemented for local topic inspection | `test_consumer.py` |
-| Flink starter | Reset to clean-by-default routing starter | `flink_service/fraud_detection.py`, `flink_service/events.py`, `flink_service/constants.py` |
-| Shared event helpers | Implemented enrichment and blocked-event helpers | `shared/events.py` |
+| Flink starter | Implements first user-scoped IP burst rule and score-based routing | `flink_service/fraud_detection.py`, `flink_service/user_detector.py`, `flink_service/rules.py`, `flink_service/events.py`, `flink_service/constants.py` |
+| Shared event schemas | Implemented dataclass event models plus older dict helpers | `shared/schemas.py`, `shared/events.py` |
 | Moderation consumer | Implemented prototype with mock mode and optional OpenAI mode | `pipeline_consumers/moderation_consumer.py`, `pipeline_consumers/moderation_rules.py` |
 | Ad injection consumer | Placeholder only; consumes approved events and simulates work | `pipeline_consumers/ad_injection_consumer.py` |
 | Spark training | Implemented offline prototype; reads historical JSONL and writes model outputs | `spark_service/spark_training.py` |
@@ -40,18 +40,28 @@ Request Simulator
 
 1. Consume raw events from `requests.raw`.
 2. Parse JSON and assign event-time watermarks.
-3. Call `detect_fraud(event)`.
-4. Add fraud context with `shared.events.add_fraud_context`.
-5. Route `clean` to `requests.clean`, `suspicious` to `requests.sus`, and `fraud` to `requests.fraud`.
+3. Key events by `request_context.user_ip`.
+4. Apply `UserFraudDetector` stateful IP burst scoring.
+5. Build typed fraud context with `shared.schemas.FraudContext`.
+6. Route `clean` to `requests.clean`, `suspicious` to `requests.sus`, and `fraud` to `requests.fraud`.
 
-`detect_fraud(event)` currently returns:
+Active Flink scoring thresholds:
 
-```python
-("clean", 0.0, [])
+```text
+score < 0.5        -> clean
+0.5 <= score < 0.8 -> suspicious
+score >= 0.8       -> fraud
 ```
 
-That is intentional. New rules should be added one at a time inside this simple
-starter before introducing extra files.
+Active Flink rule:
+
+| Rule | Scope | Score | Reason |
+| --- | --- | --- | --- |
+| More than 8 requests in 60 seconds | `user_ip` | `0.6` | `ip_burst` |
+| Negative prompt language pattern | request | `0.2` | `negative_prompt` |
+
+Stateless rules should be added to `flink_service/rules.py`. User/IP scoped
+stateful rules should be added to `flink_service/user_detector.py`.
 
 ## Deleted From Flink
 
@@ -70,7 +80,7 @@ The old Flink fraud internals were removed:
 
 | Missing piece | Why it matters |
 | --- | --- |
-| Flink fraud rules | Starter currently routes valid requests as clean. Add rules one by one. |
+| More Flink fraud rules | Only IP burst exists so far. Add rules one by one. |
 | RFC scoring service | Needed to consume `requests.sus`, load the Spark-trained model, and route suspicious requests to `requests.clean` or `requests.fraud`. |
 | Online model artifact contract | Needed so Spark output can be safely loaded by the RFC scoring service. |
 | Clean event contract across all stages | Needed so Flink, RFC scoring, moderation, exporter, and Spark agree on payload shapes. |
@@ -81,7 +91,7 @@ The old Flink fraud internals were removed:
 
 ## Next Flink Steps
 
-1. Add one understandable fraud rule to `detect_fraud(event)`.
-2. Keep it in `flink_service/fraud_detection.py` until the file becomes too big.
-3. Only then move rules into a small `flink_service/rules.py` table.
-4. Keep output routing unchanged unless the architecture changes.
+1. Add bad user-agent scoring.
+2. Add geo travel scoring.
+3. Add session scoped rules in a new detector only when needed.
+4. Add publisher scoped rules in a new detector only when needed.
