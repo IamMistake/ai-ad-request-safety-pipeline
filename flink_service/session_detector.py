@@ -1,10 +1,23 @@
+import base64
+import binascii
 import json
+import re
+from difflib import SequenceMatcher
 
 from pyflink.common import Types
 from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
 from pyflink.datastream.state import ListStateDescriptor
 
 from flink_service.constants import (
+    PROMPT_REPLAY_MIN_SIMILARITY,
+    PROMPT_REPLAY_SCORE,
+    PROMPT_REPLAY_WINDOW_SECONDS,
+    REGULAR_CADENCE_MAX_INTERVAL_DRIFT_MS,
+    REGULAR_CADENCE_MIN_REQUESTS,
+    REGULAR_CADENCE_SCORE,
+    SESSION_ASN_CHURN_MIN_UNIQUE_ASNS,
+    SESSION_ASN_CHURN_SCORE,
+    SESSION_ASN_CHURN_WINDOW_SECONDS,
     SESSION_BURST_MAX_REQUESTS,
     SESSION_BURST_SCORE,
     SESSION_BURST_WINDOW_SECONDS,
@@ -23,21 +36,62 @@ from flink_service.events import (
 )
 from shared.schemas import DetectionResult
 
+PROMPT_WHITESPACE_PATTERN = re.compile(r"\s+")
 
-def _recent_values(
+
+def _encode_value(value: str) -> str:
+    return base64.urlsafe_b64encode(value.encode("utf-8")).decode("ascii")
+
+
+def _decode_value(value: str) -> str:
+    return base64.urlsafe_b64decode(value.encode("ascii")).decode("utf-8")
+
+
+def _normalise_prompt(prompt: str) -> str:
+    return PROMPT_WHITESPACE_PATTERN.sub(" ", prompt.strip().lower())
+
+
+def _similar_prompt(prompt: str, recent_prompts: list[str]) -> bool:
+    if not prompt:
+        return False
+    for recent_prompt in recent_prompts:
+        if prompt == recent_prompt:
+            return True
+        similarity = SequenceMatcher(None, prompt, recent_prompt).ratio()
+        if similarity >= PROMPT_REPLAY_MIN_SIMILARITY:
+            return True
+    return False
+
+
+def _regular_cadence(timestamps: list[int]) -> bool:
+    if len(timestamps) < REGULAR_CADENCE_MIN_REQUESTS:
+        return False
+
+    recent_timestamps = sorted(timestamps)[-REGULAR_CADENCE_MIN_REQUESTS:]
+    intervals = [
+        later - earlier
+        for earlier, later in zip(recent_timestamps, recent_timestamps[1:])
+    ]
+    if any(interval <= 0 for interval in intervals):
+        return False
+    return max(intervals) - min(intervals) <= REGULAR_CADENCE_MAX_INTERVAL_DRIFT_MS
+
+
+def _recent_observations(
     state,
     timestamp_ms: int,
     window_seconds: int,
     value: str,
-) -> set[str]:
+) -> list[tuple[int, str]]:
     window_start_ms = timestamp_ms - (window_seconds * 1000)
     observations = []
 
     for raw_value in state.get() or []:
         try:
-            raw_timestamp_ms, old_value = raw_value.split("|", 1)
+            raw_timestamp_ms, encoded_value = raw_value.split("|", 1)
             old_timestamp_ms = int(raw_timestamp_ms)
-        except (AttributeError, TypeError, ValueError):
+            old_value = _decode_value(encoded_value)
+        except (AttributeError, TypeError, ValueError, binascii.Error):
             continue
         if old_timestamp_ms >= window_start_ms:
             observations.append((old_timestamp_ms, old_value))
@@ -45,10 +99,20 @@ def _recent_values(
     observations.append((timestamp_ms, value))
     state.update(
         [
-            f"{observed_at}|{observed_value}"
+            f"{observed_at}|{_encode_value(observed_value)}"
             for observed_at, observed_value in observations
         ]
     )
+    return observations
+
+
+def _recent_values(
+    state,
+    timestamp_ms: int,
+    window_seconds: int,
+    value: str,
+) -> set[str]:
+    observations = _recent_observations(state, timestamp_ms, window_seconds, value)
     return {observed_value for _, observed_value in observations}
 
 
@@ -62,6 +126,12 @@ class SessionFraudDetector(KeyedProcessFunction):
             "recent_session_countries", Types.STRING()
         )
         self.recent_countries = runtime_context.get_list_state(country_descriptor)
+        asn_descriptor = ListStateDescriptor("recent_session_asns", Types.STRING())
+        self.recent_asns = runtime_context.get_list_state(asn_descriptor)
+        prompt_descriptor = ListStateDescriptor(
+            "recent_session_prompts", Types.STRING()
+        )
+        self.recent_prompts = runtime_context.get_list_state(prompt_descriptor)
 
     def process_element(self, value: str, ctx: "KeyedProcessFunction.Context"):
         event = load_event(value)
@@ -97,6 +167,10 @@ class SessionFraudDetector(KeyedProcessFunction):
                 score += SESSION_BURST_SCORE
                 reasons.append("session_burst")
 
+            if _regular_cadence(recent_timestamps):
+                score += REGULAR_CADENCE_SCORE
+                reasons.append("regular_cadence")
+
             user_ip = get_user_ip(request)
             if user_ip:
                 unique_ips = _recent_values(
@@ -120,5 +194,33 @@ class SessionFraudDetector(KeyedProcessFunction):
                 if len(unique_countries) > SESSION_COUNTRY_HOP_MAX_COUNTRIES:
                     score += SESSION_COUNTRY_HOP_SCORE
                     reasons.append("session_country_hop")
+
+            asn = request.optional_context.asn
+            if asn is not None:
+                unique_asns = _recent_values(
+                    self.recent_asns,
+                    event_timestamp_ms,
+                    SESSION_ASN_CHURN_WINDOW_SECONDS,
+                    str(asn),
+                )
+                if len(unique_asns) >= SESSION_ASN_CHURN_MIN_UNIQUE_ASNS:
+                    score += SESSION_ASN_CHURN_SCORE
+                    reasons.append("session_asn_churn")
+
+            prompt = _normalise_prompt(request.prompt)
+            if prompt:
+                prompt_observations = _recent_observations(
+                    self.recent_prompts,
+                    event_timestamp_ms,
+                    PROMPT_REPLAY_WINDOW_SECONDS,
+                    prompt,
+                )
+                previous_prompts = [
+                    recent_prompt
+                    for _, recent_prompt in prompt_observations[:-1]
+                ]
+                if _similar_prompt(prompt, previous_prompts):
+                    score += PROMPT_REPLAY_SCORE
+                    reasons.append("prompt_replay")
 
         yield json.dumps(DetectionResult(request, score, reasons).to_dict())

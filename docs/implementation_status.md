@@ -63,6 +63,9 @@ Active Flink rule:
 | More than 12 requests in 60 seconds | `session_id` | `0.4` | `session_burst` |
 | At least 2 unique IPs in 120 seconds | `session_id` | `0.4` | `session_ip_churn` |
 | More than 2 countries in 120 seconds | `session_id` | `0.5` | `session_country_hop` |
+| At least 2 unique ASNs in 120 seconds | `session_id` | `0.4` | `session_asn_churn` |
+| Same or at least 90% similar normalized prompt in 300 seconds | `session_id` | `0.4` | `prompt_replay` |
+| Last 4 request intervals differ by no more than 250ms | `session_id` | `0.3` | `regular_cadence` |
 | Negative prompt language pattern | request | `0.2` | `negative_prompt` |
 | Automated or suspicious user-agent pattern | request | `0.2` | `bad_user_agent` |
 | ASN is in the local high-risk ASN denylist | request | `0.2` | `asn_risk` |
