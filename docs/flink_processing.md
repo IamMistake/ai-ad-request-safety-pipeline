@@ -45,14 +45,23 @@ new rule is active now.
 | --- | --- | --- |
 | IP burst | `user_ip` | More than 8 requests in 60 seconds adds `0.6` and reason `ip_burst` |
 | Negative prompt | request | Matching negative-language pattern adds `0.2` and reason `negative_prompt` |
+| Bad user-agent | request | Automated/headless user-agent patterns add `0.2` and reason `bad_user_agent` |
+| ASN risk | request | ASN in the local high-risk ASN denylist adds `0.2` and reason `asn_risk` |
+| Language/country mismatch | request | Non-English language outside expected countries adds `0.1` and reason `language_mismatch_country` |
 
 `flink_service/rules.py` contains the stateless rule list:
 
 ```python
 RULES = [
     rule_negative_prompt,
+    rule_bad_user_agent,
+    rule_asn_risk,
+    rule_language_mismatch_country,
 ]
 ```
+
+English is treated as global for language/country mismatch and does not trigger
+that rule. Missing or unknown language/country values do not score in this rule.
 
 Stateful user rules live in `flink_service/user_detector.py`.
 
@@ -69,8 +78,8 @@ Add new rules one at a time. Keep each rule small and obvious.
 Recommended order:
 
 1. Missing or invalid request fields.
-2. Bad or automated user agent.
-3. Basic prompt repetition rule.
+2. Basic prompt repetition rule.
+3. Spark-derived ASN risk score loading.
 4. Session and publisher scoped rules.
 
 Add stateless rules to `flink_service/rules.py`. Add stateful rules to a scoped
