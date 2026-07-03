@@ -83,6 +83,6 @@
 
   <!-- Threshold labels -->
   <text x="620" y="128" text-anchor="middle" fill="#14b8a6" font-size="8">&lt; 0.5</text>
-  <text x="700" y="128" text-anchor="middle" fill="#f43f5e" font-size="8">&ge; 0.8</text>
-  <text x="780" y="128" text-anchor="middle" fill="#a855f7" font-size="8">0.5&ndash;0.8</text>
+  <text x="700" y="128" text-anchor="middle" fill="#f43f5e" font-size="8">&#8805; 0.8</text>
+  <text x="780" y="128" text-anchor="middle" fill="#a855f7" font-size="8">0.5&#8211;0.8</text>
 </svg>
