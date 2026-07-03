@@ -50,6 +50,9 @@ rule set is intentionally small and incremental.
 | Session burst | `session_id` | More than 12 requests in 60 seconds adds `0.4` and reason `session_burst` |
 | Session IP churn | `session_id` | At least 2 unique IPs in 120 seconds adds `0.4` and reason `session_ip_churn` |
 | Session country hop | `session_id` | More than 2 countries in 120 seconds adds `0.5` and reason `session_country_hop` |
+| Session ASN churn | `session_id` | At least 2 unique ASNs in 120 seconds adds `0.4` and reason `session_asn_churn` |
+| Prompt replay | `session_id` | Same or at least 90% similar normalized prompt in 300 seconds adds `0.4` and reason `prompt_replay` |
+| Regular cadence | `session_id` | Last 4 request intervals differ by no more than 250ms and add `0.3` with reason `regular_cadence` |
 | Negative prompt | request | Matching negative-language pattern adds `0.2` and reason `negative_prompt` |
 | Bad user-agent | request | Automated/headless user-agent patterns add `0.2` and reason `bad_user_agent` |
 | ASN risk | request | ASN in the local high-risk ASN denylist adds `0.2` and reason `asn_risk` |
