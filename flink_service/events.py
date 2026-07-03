@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 
+from shared.schemas import RawRequestEvent
+
 
 def load_event(raw_value: str) -> dict:
     try:
@@ -29,3 +31,22 @@ def extract_event_timestamp_ms(event: dict) -> int | None:
         return None
 
     return int(parsed.timestamp() * 1000)
+
+
+def get_user_ip(request: RawRequestEvent) -> str:
+    return request.request_context.user_ip.strip()
+
+
+def extract_raw_request_timestamp_ms(request: RawRequestEvent) -> int | None:
+    return extract_event_timestamp_ms(request.to_dict())
+
+
+def extract_user_ip_key(raw_value: str) -> str:
+    event = load_event(raw_value)
+    if "_parse_error" in event:
+        return "unknown_ip"
+
+    user_ip = get_user_ip(RawRequestEvent.from_dict(event))
+    if user_ip:
+        return user_ip
+    return "unknown_ip"

@@ -178,10 +178,24 @@ Published to `ad.injection` after fraud/RFC and moderation approval.
 }
 ```
 
-## Shared Event Helpers
+## Shared Event Schemas
 
-`shared/events.py` centralizes the copied event enrichment shape used by later
-pipeline phases.
+Kafka messages are still JSON. Inside Python code, event payloads should be
+parsed into dataclasses from `shared/schemas.py`, then serialized back to JSON at
+Kafka boundaries.
+
+| Class | Kafka shape |
+| --- | --- |
+| `RequestContext` | Nested `request_context` object |
+| `OptionalContext` | Nested `optional_context` object |
+| `RawRequestEvent` | `requests.raw` request event |
+| `FraudContext` | Nested `fraud` object |
+| `FraudEnrichedRequestEvent` | `requests.clean` and `requests.sus` event |
+| `BlockedRequestEvent` | `requests.fraud` blocked event |
+| `DetectionResult` | Internal Flink handoff between stateful detectors and routing |
+
+`shared/events.py` still contains older dict helpers used by prototype services.
+Prefer `shared/schemas.py` for new code.
 
 | Helper | Adds or builds |
 | --- | --- |
