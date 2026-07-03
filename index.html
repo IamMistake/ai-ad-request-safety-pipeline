@@ -3,8 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Real-time fraud detection and moderation pipeline for AI advertising systems. University project for Massive Data Mining.">
-  <title>Request Fraud &amp; Moderation Detection</title>
+  <meta name="description" content="AI ad request safety pipeline for real-time fraud detection, content moderation, stream processing, and offline risk-model training.">
+  <meta property="og:title" content="AI Ad Request Safety Pipeline">
+  <meta property="og:description" content="Kafka, Flink, Spark, and moderation pipeline for safer AI ad requests.">
+  <meta property="og:url" content="https://iammistake.github.io/ai-ad-request-safety-pipeline/">
+  <link rel="canonical" href="https://iammistake.github.io/ai-ad-request-safety-pipeline/">
+  <title>AI Ad Request Safety Pipeline</title>
 
   <meta name="theme-color" content="#4338ca">
 
@@ -13,7 +17,7 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <link rel="stylesheet" href="css/style.css">
@@ -26,7 +30,7 @@
       <div class="toc-inner">
         <button class="toc-head" id="toc-toggle" aria-label="Toggle table of contents">
           <span class="toc-badge"><i class="fa-solid fa-shield-halved"></i></span>
-          <span class="toc-title"><span class="toc-short">RNMP</span><span class="toc-long">RNMP Project</span></span>
+          <span class="toc-title"><span class="toc-short">Contents</span><span class="toc-long">Contents</span></span>
           <span class="toc-expand"><i class="fa-solid fa-angle-up"></i></span>
         </button>
         <div class="toc-links" id="toc-links">
@@ -48,28 +52,44 @@
     <!-- ====== HERO ====== -->
     <section class="hero-banner">
       <div class="container">
-        <span class="pub-eyebrow"><i class="fa-solid fa-graduation-cap"></i> Massive Data Mining &middot; University Project</span>
-        <h1 class="pub-title">Request Fraud &amp; <br>Moderation Detection</h1>
-        <p class="pub-subtitle">
-          A streaming pipeline that detects ad request fraud and moderates unsafe content
-          in real-time using Apache Kafka, Flink, and Spark.
-        </p>
+        <div class="hero-layout">
+          <div class="hero-copy">
+            <span class="pub-eyebrow"><i class="fa-solid fa-graduation-cap"></i> Massive Data Mining &middot; University Project</span>
+            <h1 class="pub-title">AI Ad Request <br>Safety Pipeline</h1>
+            <p class="pub-subtitle">
+              A real-time safety pipeline for AI advertising requests: fraud signals, suspicious
+              stream routing, prompt moderation, and offline risk-model training.
+            </p>
 
-        <div class="pub-links">
-          <a href="#pipeline" class="pub-btn">
-            <span class="icon"><i class="fa-solid fa-sitemap"></i></span>
-            Explore the Pipeline
-          </a>
-          <a href="https://github.com/IamMistake/request-fraud-and-moderation-detection" class="pub-btn" target="_blank" rel="noopener">
-            <span class="icon"><i class="fa-brands fa-github"></i></span>
-            View on GitHub
-          </a>
+            <div class="pub-links">
+              <a href="#pipeline" class="pub-btn">
+                <span class="icon"><i class="fa-solid fa-sitemap"></i></span>
+                Explore the Pipeline
+              </a>
+              <a href="https://github.com/IamMistake/ai-ad-request-safety-pipeline" class="pub-btn pub-btn-secondary" target="_blank" rel="noopener">
+                <span class="icon"><i class="fa-brands fa-github"></i></span>
+                View on GitHub
+              </a>
+            </div>
+          </div>
+
+          <div class="hero-visual" aria-label="Layered request safety pipeline visualization">
+            <div class="signal-orb"></div>
+            <div class="safety-stack">
+              <div class="stack-topline"><span>live request</span><code>req_7f8a</code></div>
+              <div class="stack-row raw"><span class="stack-dot"></span><span>requests.raw</span><strong>Kafka</strong></div>
+              <div class="stack-row score"><span class="stack-dot"></span><span>fraud score</span><strong>0.63</strong></div>
+              <div class="stack-row sus"><span class="stack-dot"></span><span>requests.sus</span><strong>review</strong></div>
+              <div class="stack-row safe"><span class="stack-dot"></span><span>moderation</span><strong>clean</strong></div>
+              <div class="stack-footer"><i class="fa-solid fa-shield-halved"></i> Safety decision before ad injection</div>
+            </div>
+          </div>
         </div>
 
         <div class="metrics-strip">
           <div class="metric-card">
             <span class="metric-num">14</span>
-            <div class="metric-label">Fraud Detection Rules</div>
+            <div class="metric-label">Fraud Rules</div>
           </div>
           <div class="metric-card">
             <span class="metric-num">5</span>
@@ -77,11 +97,11 @@
           </div>
           <div class="metric-card">
             <span class="metric-num">3</span>
-            <div class="metric-label">Detection Services</div>
+            <div class="metric-label">Safety Services</div>
           </div>
           <div class="metric-card">
             <span class="metric-num">2k</span>
-            <div class="metric-label">Pipeline Test Run</div>
+            <div class="metric-label">Pipeline Test</div>
           </div>
         </div>
       </div>
@@ -576,13 +596,13 @@ python spark_service/spark_training.py</code></pre>
           <button class="bibtex-copy" id="bibtex-copy" aria-label="Copy BibTeX to clipboard">
             <i class="fa-regular fa-clipboard"></i> Copy
           </button>
-          <pre>@misc{rnmp2026,
-  title  = {Request Fraud and Moderation Detection Pipeline},
+          <pre>@misc{ai_ad_request_safety_pipeline_2026,
+  title  = {AI Ad Request Safety Pipeline},
   author = {Massive Data Mining Project Team},
   year   = {2026},
   note   = {University of Ss. Cyril and Methodius,
             Faculty of Computer Science and Engineering},
-  howpublished = {\url{https://github.com/IamMistake/request-fraud-and-moderation-detection}}
+  howpublished = {\url{https://github.com/IamMistake/ai-ad-request-safety-pipeline}}
 }</pre>
         </div>
       </div>
@@ -604,7 +624,7 @@ python spark_service/spark_training.py</code></pre>
         </div>
         <p class="footer-credit">
           Massive Data Mining &middot; University Project &middot;
-          <a href="https://github.com/IamMistake/request-fraud-and-moderation-detection" target="_blank" rel="noopener">
+          <a href="https://github.com/IamMistake/ai-ad-request-safety-pipeline" target="_blank" rel="noopener">
             <i class="fa-brands fa-github"></i> GitHub
           </a>
         </p>

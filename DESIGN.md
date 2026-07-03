@@ -1,0 +1,28 @@
+# AI Ad Request Safety Pipeline Design System
+
+## Direction
+
+The site presents a security/data pipeline as a polished safety-systems product page: bright, technical, trustworthy, and dimensional without turning into generic blue-purple SaaS. The memorable moment is the hero's layered request-inspection stack: raw request, stream routing, risk scoring, and content safety shown as lit operational layers.
+
+## Tokens
+
+- Canvas: `#fbfcff`, `#f6f8ff`, `#edf4ff`
+- Ink: `#0f172a`, `#243044`, `#64748b`
+- Primary: `#2f46d8`, `#5268ff`, `#8fa4ff`
+- Signal: `#00a6d6`, `#14b8a6`, `#f59e0b`, `#e11d48`
+- Surface: translucent white with 1px cool borders, blue-tinted shadows, subtle mesh/glow backgrounds
+- Typography: Manrope for display/body, JetBrains Mono for metrics/code
+
+## Components
+
+- Floating Contents rail: compact glass surface, active section gradient, explicit `Contents` label.
+- Hero buttons: dark primary, glass secondary, transform-only hover/active states.
+- Metric cards: white glass cards with tinted shadows and tabular numeric display.
+- Safety stack card: layered glass panels, status chips, and signal rails to create the hero focal object.
+- Diagram/cards/tables: rounded technical cards with one consistent light direction and restrained accent colors.
+
+## Motion and States
+
+- Motion only communicates affordance or entrance. Use `transform` and `opacity`; no layout-property animation.
+- Hover states lift or illuminate interactive controls. Focus states must remain visible.
+- Reduced-motion users receive static visible content.
