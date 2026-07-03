@@ -59,6 +59,9 @@ Active Flink rule:
 | --- | --- | --- | --- |
 | More than 8 requests in 60 seconds | `user_ip` | `0.6` | `ip_burst` |
 | Negative prompt language pattern | request | `0.2` | `negative_prompt` |
+| Automated or suspicious user-agent pattern | request | `0.2` | `bad_user_agent` |
+| ASN is in the local high-risk ASN denylist | request | `0.2` | `asn_risk` |
+| Non-English language is unusual for request country | request | `0.1` | `language_mismatch_country` |
 
 Stateless rules should be added to `flink_service/rules.py`. User/IP scoped
 stateful rules should be added to `flink_service/user_detector.py`.
@@ -91,7 +94,7 @@ The old Flink fraud internals were removed:
 
 ## Next Flink Steps
 
-1. Add bad user-agent scoring.
-2. Add geo travel scoring.
+1. Add geo travel scoring.
+2. Replace or extend the local high-risk ASN denylist with Spark-derived ASN risk scores.
 3. Add session scoped rules in a new detector only when needed.
 4. Add publisher scoped rules in a new detector only when needed.
