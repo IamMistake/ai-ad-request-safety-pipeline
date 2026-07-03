@@ -37,6 +37,10 @@ def get_user_ip(request: RawRequestEvent) -> str:
     return request.request_context.user_ip.strip()
 
 
+def get_session_id(request: RawRequestEvent) -> str:
+    return request.request_context.session_id.strip()
+
+
 def extract_raw_request_timestamp_ms(request: RawRequestEvent) -> int | None:
     return extract_event_timestamp_ms(request.to_dict())
 
@@ -50,3 +54,18 @@ def extract_user_ip_key(raw_value: str) -> str:
     if user_ip:
         return user_ip
     return "unknown_ip"
+
+
+def extract_session_id_key(raw_value: str) -> str:
+    event = load_event(raw_value)
+    if "_parse_error" in event:
+        return "unknown_session"
+
+    raw_request = event.get("raw_request")
+    if isinstance(raw_request, dict):
+        event = raw_request
+
+    session_id = get_session_id(RawRequestEvent.from_dict(event))
+    if session_id:
+        return session_id
+    return "unknown_session"
