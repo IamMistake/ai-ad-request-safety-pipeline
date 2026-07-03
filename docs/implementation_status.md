@@ -26,7 +26,7 @@ Request Simulator
 | Request simulator | Implemented prototype; publishes nested request events to `requests.raw` | `kafka/producers/request_simulator.py`, `kafka/producers/simulator_events.py` |
 | Shared topic constants | Implemented for active topics | `pipeline_consumers/constants.py` |
 | Debug consumer | Implemented for local topic inspection | `test_consumer.py` |
-| Flink starter | Implements IP burst, session-scoped scoring, stateless scoring rules, and score-based routing | `flink_service/fraud_detection.py`, `flink_service/user_detector.py`, `flink_service/session_detector.py`, `flink_service/rules.py`, `flink_service/events.py`, `flink_service/constants.py` |
+| Flink starter | Implements IP burst, session-scoped scoring, publisher burst, stateless scoring rules, and score-based routing | `flink_service/fraud_detection.py`, `flink_service/user_detector.py`, `flink_service/session_detector.py`, `flink_service/publisher_detector.py`, `flink_service/rules.py`, `flink_service/events.py`, `flink_service/constants.py` |
 | Shared event schemas | Implemented dataclass event models plus older dict helpers | `shared/schemas.py`, `shared/events.py` |
 | Moderation consumer | Implemented prototype with mock mode and optional OpenAI mode | `pipeline_consumers/moderation_consumer.py`, `pipeline_consumers/moderation_rules.py` |
 | Ad injection consumer | Placeholder only; consumes approved events and simulates work | `pipeline_consumers/ad_injection_consumer.py` |
@@ -44,8 +44,10 @@ Request Simulator
 4. Apply `UserFraudDetector` stateful IP burst scoring.
 5. Key detection results by `request_context.session_id`.
 6. Apply `SessionFraudDetector` stateful session burst scoring.
-7. Build typed fraud context with `shared.schemas.FraudContext`.
-8. Route `clean` to `requests.clean`, `suspicious` to `requests.sus`, and `fraud` to `requests.fraud`.
+7. Key detection results by `publisher_id`.
+8. Apply `PublisherFraudDetector` stateful publisher burst scoring.
+9. Build typed fraud context with `shared.schemas.FraudContext`.
+10. Route `clean` to `requests.clean`, `suspicious` to `requests.sus`, and `fraud` to `requests.fraud`.
 
 Active Flink scoring thresholds:
 
@@ -66,6 +68,9 @@ Active Flink rule:
 | At least 2 unique ASNs in 120 seconds | `session_id` | `0.4` | `session_asn_churn` |
 | Same or at least 90% similar normalized prompt in 300 seconds | `session_id` | `0.4` | `prompt_replay` |
 | Last 4 request intervals differ by no more than 250ms | `session_id` | `0.3` | `regular_cadence` |
+| More than 100 requests in 60 seconds | `publisher_id` | `0.3` | `publisher_burst` |
+| At least 20 requests with >5% flagged by prior detectors in 600s | `publisher_id` | `0.3` | `publisher_suspicious_rate` |
+| At least 30 requests with >10% bad or empty user-agents in 600s | `publisher_id` | `0.3` | `publisher_bad_ua_rate` |
 | Negative prompt language pattern | request | `0.2` | `negative_prompt` |
 | Automated or suspicious user-agent pattern | request | `0.2` | `bad_user_agent` |
 | ASN is in the local high-risk ASN denylist | request | `0.2` | `asn_risk` |
@@ -74,6 +79,8 @@ Active Flink rule:
 Stateless rules should be added to `flink_service/rules.py`. User/IP scoped
 stateful rules should be added to `flink_service/user_detector.py`. Session
 scoped stateful rules should be added to `flink_service/session_detector.py`.
+Publisher scoped stateful rules should be added to
+`flink_service/publisher_detector.py`.
 
 ## Deleted From Flink
 
@@ -105,4 +112,4 @@ The old Flink fraud internals were removed:
 
 1. Add geo travel scoring.
 2. Replace or extend the local high-risk ASN denylist with Spark-derived ASN risk scores.
-3. Add publisher scoped rules in a new detector only when needed.
+3. Add prompt repetition or similarity rules across sessions.
