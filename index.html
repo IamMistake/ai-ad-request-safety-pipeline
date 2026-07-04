@@ -95,7 +95,8 @@
       <div class="container">
         <div class="hero-layout">
           <div class="hero-copy">
-            <span class="pub-eyebrow"><i class="fa-solid fa-graduation-cap"></i> Massive Data Mining &middot; FINKI</span>
+            <span class="pub-eyebrow"><i class="fa-solid fa-graduation-cap"></i> Massive Data Mining &middot;
+              FINKI</span>
             <h1 class="pub-title">AI Ad Request <br>Safety Pipeline</h1>
             <p class="pub-subtitle">
               A real-time safety pipeline for
@@ -107,13 +108,13 @@
             <div class="hero-meta" aria-label="Project author and affiliation">
               <div class="hero-author-row">
                 <a href="https://github.com/IamMistake" target="_blank" rel="noopener">Nikola Jagurinoski</a>
-                <span class="hero-contribution">Fully made by me</span>
               </div>
               <div class="hero-affiliation-row">
                 <span><sup>1</sup> FINKI, University of Ss. Cyril and Methodius</span>
               </div>
               <div class="hero-contact-row">
-                <a href="mailto:jagurinoskini@gmail.com"><i class="fa-regular fa-envelope"></i> jagurinoskini@gmail.com</a>
+                <a href="mailto:jagurinoskini@gmail.com"><i class="fa-regular fa-envelope"></i>
+                  jagurinoskini@gmail.com</a>
               </div>
             </div>
 
@@ -281,7 +282,8 @@
               <h4>Kafka Event Stream</h4>
               <p>Five topics decouple all pipeline stages: <code>requests.raw</code> (ingress),
                 <code>requests.sus</code> (suspicious), <code>requests.clean</code> (fraud-clean),
-                <code>requests.fraud</code> (blocked), and <code>ad.injection</code> (approved).</p>
+                <code>requests.fraud</code> (blocked), and <code>ad.injection</code> (approved).
+              </p>
             </div>
           </div>
           <div class="flow-step" style="--fs-color:#06b6d4">
@@ -299,7 +301,8 @@
               <h4>RFC Scoring <span class="badge badge-planned">Planned</span></h4>
               <p>Consumes <code>requests.sus</code> and applies the Spark-trained RandomForest model to score suspicious
                 requests. Cleared requests go to <code>requests.clean</code>; confirmed fraud goes to
-                <code>requests.fraud</code>.</p>
+                <code>requests.fraud</code>.
+              </p>
             </div>
           </div>
           <div class="flow-step" style="--fs-color:#f43f5e">
@@ -308,7 +311,8 @@
               <h4>Content Moderation</h4>
               <p>Analyzes prompt content for safety using mock (rule-based keyword + TF-IDF) or OpenAI
                 (omni-moderation-latest) modes. Prompt caching via SHA256 hash. Routes clean to
-                <code>ad.injection</code>, unsafe to <code>requests.fraud</code>.</p>
+                <code>ad.injection</code>, unsafe to <code>requests.fraud</code>.
+              </p>
             </div>
           </div>
           <div class="flow-step" style="--fs-color:#8b5cf6">
@@ -507,22 +511,27 @@
             <article class="moderation-path-card safe-path">
               <span class="path-label">Low similarity, no audit</span>
               <h4>Allow directly</h4>
-              <p><code>requests.clean</code> enters moderation, similarity stays below threshold, and the event moves to <code>ad.injection</code>.</p>
+              <p><code>requests.clean</code> enters moderation, similarity stays below threshold, and the event moves to
+                <code>ad.injection</code>.
+              </p>
             </article>
             <article class="moderation-path-card review-path">
               <span class="path-label">High similarity</span>
               <h4>OpenAI final check</h4>
-              <p>Risky prompts are escalated. Clean verdicts continue to <code>ad.injection</code>; flagged verdicts go to <code>requests.fraud</code>.</p>
+              <p>Risky prompts are escalated. Clean verdicts continue to <code>ad.injection</code>; flagged verdicts go
+                to <code>requests.fraud</code>.</p>
             </article>
             <article class="moderation-path-card audit-path">
               <span class="path-label">2% audit sample</span>
               <h4>Random quality control</h4>
-              <p>Low-similarity prompts can still be sampled for OpenAI review to catch drift and validate the local TF-IDF gate.</p>
+              <p>Low-similarity prompts can still be sampled for OpenAI review to catch drift and validate the local
+                TF-IDF gate.</p>
             </article>
             <article class="moderation-path-card error-path">
               <span class="path-label">OpenAI error</span>
               <h4>Allow with context</h4>
-              <p>OpenAI failures are allowed to <code>ad.injection</code> but marked as <code>openai_error_allow</code> for downstream observability.</p>
+              <p>OpenAI failures are allowed to <code>ad.injection</code> but marked as <code>openai_error_allow</code>
+                for downstream observability.</p>
             </article>
           </div>
         </div>
@@ -666,7 +675,8 @@
           <h4><i class="fa-solid fa-magnifying-glass-chart"></i> Analysis</h4>
           <ul>
             <li>Shallow denials are mostly <code>ip_burst</code> combinations (especially with
-              <code>suspicious_ua</code>).</li>
+              <code>suspicious_ua</code>).
+            </li>
             <li>Many sessions hit fallback IP <code>8.8.8.8</code>, inflating repeated-IP signals.</li>
             <li>Flink marks as <code>suspicious</code> at any score above 0.5, so suspicious dominates.</li>
             <li>No requests exceeded the 0.8 fraud threshold in this test run.</li>
@@ -772,14 +782,20 @@
             <div class="anim-branch-map" aria-label="Animated branching request pipeline">
               <div class="anim-path path-user-raw" id="anim-link-user-raw"><span class="pulse-dot"></span></div>
               <div class="anim-path path-raw-flink" id="anim-link-raw-flink"><span class="pulse-dot"></span></div>
-              <div class="anim-path path-flink-sus" id="anim-link-flink-sus"><span class="pulse-dot"></span><span class="path-word">suspicious</span></div>
-              <div class="anim-path path-flink-clean pass" id="anim-link-flink-clean"><span class="pulse-dot"></span><span class="path-word">clean</span></div>
-              <div class="anim-path path-flink-fraud fail" id="anim-link-flink-fraud"><span class="pulse-dot"></span><span class="path-word">fraud</span></div>
+              <div class="anim-path path-flink-sus" id="anim-link-flink-sus"><span class="pulse-dot"></span><span
+                  class="path-word">suspicious</span></div>
+              <div class="anim-path path-flink-clean pass" id="anim-link-flink-clean"><span
+                  class="pulse-dot"></span><span class="path-word">clean</span></div>
+              <div class="anim-path path-flink-fraud fail" id="anim-link-flink-fraud"><span
+                  class="pulse-dot"></span><span class="path-word">fraud</span></div>
               <div class="anim-path path-sus-rfc" id="anim-link-sus-rfc"><span class="pulse-dot"></span></div>
-              <div class="anim-path path-rfc-clean pass" id="anim-link-rfc-clean"><span class="pulse-dot"></span><span class="path-word pass">clean</span></div>
-              <div class="anim-path path-rfc-fraud fail" id="anim-link-rfc-fraud"><span class="pulse-dot"></span><span class="path-word fail">fraud</span></div>
-              <div class="anim-path path-clean-moderation" id="anim-link-clean-moderation"><span class="pulse-dot"></span></div>
-              <div class="anim-path path-moderation-ad pass" id="anim-link-moderation-ad"><span class="pulse-dot"></span><span class="path-word pass">safe</span></div>
+              <div class="anim-path path-rfc-clean pass" id="anim-link-rfc-clean"><span class="pulse-dot"></span><span
+                  class="path-word pass">clean</span></div>
+              <!-- <div class="anim-path path-rfc-fraud fail" id="anim-link-rfc-fraud"><span class="pulse-dot"></span><span class="path-word fail">fraud</span></div> -->
+              <div class="anim-path path-clean-moderation" id="anim-link-clean-moderation"><span
+                  class="pulse-dot"></span></div>
+              <div class="anim-path path-moderation-ad pass" id="anim-link-moderation-ad"><span
+                  class="pulse-dot"></span><span class="path-word pass">safe</span></div>
               <div class="anim-path path-fraud-db" id="anim-link-fraud-db"><span class="pulse-dot"></span></div>
               <div class="anim-path path-ad-process" id="anim-link-ad-process"><span class="pulse-dot"></span></div>
 
@@ -835,7 +851,8 @@
 
             <div class="anim-scenario-card" id="anim-scenario-card">
               <strong id="anim-scenario-example">Example:</strong>
-              <span id="anim-scenario-result">Normal IP, normal session, safe prompt. Final result: approved for ad injection.</span>
+              <span id="anim-scenario-result">Normal IP, normal session, safe prompt. Final result: approved for ad
+                injection.</span>
             </div>
 
             <div class="anim-loop-chip" id="anim-loop-chip">
