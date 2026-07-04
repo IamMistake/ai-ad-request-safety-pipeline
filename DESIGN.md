@@ -20,6 +20,9 @@ The site presents a security/data pipeline as a polished safety-systems product 
 - Metric cards: white glass cards with tinted shadows and tabular numeric display.
 - Safety stack card: layered glass panels, status chips, and signal rails to create the hero focal object.
 - Diagram/cards/tables: rounded technical cards with one consistent light direction and restrained accent colors.
+- Hero metadata row: centered/link-forward author, affiliation, contribution, and contact line in the academic-project-page style.
+- Compact diagram frame: large source diagrams render inside centered, max-width figure cards instead of occupying the full content width.
+- Interactive pipeline view: dark, grid-aligned operational map with visible connector rails and stateful node illumination.
 
 ## Motion and States
 

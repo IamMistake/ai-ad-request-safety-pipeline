@@ -132,12 +132,13 @@
     step: 0,
     timer: null,
     steps: [
-      { node: null, status: 'Request entering Kafka...', delay: 600 },
-      { node: 'kafka', status: 'Ingested into requests.raw topic', delay: 1000 },
-      { node: 'flink', status: 'Flink evaluating fraud rules...', delay: 1200 },
-      { node: 'routing', status: 'Routing suspicious requests to moderation', delay: 800 },
-      { node: 'moderation', status: 'Moderation checking prompt safety...', delay: 1200 },
-      { node: 'ad', status: 'Clean request approved for ad injection', delay: 1000 },
+      { node: 'source', connector: 'sourceKafka', status: 'Real traffic enters with injected fraud requests', delay: 900 },
+      { node: 'kafka', connector: 'kafkaFlink', status: 'Kafka stores the event in requests.raw', delay: 900 },
+      { node: 'flink', connector: 'flinkRouting', status: 'Flink evaluates stateful fraud signals', delay: 1100 },
+      { node: 'spark', connector: 'sparkRouting', status: 'Spark-trained model context supports suspicious scoring', delay: 800 },
+      { node: 'routing', connector: 'routingModeration', status: 'Clean fraud verdict moves to moderation', delay: 850 },
+      { node: 'moderation', connector: 'moderationAd', status: 'Moderation checks prompt safety', delay: 1100 },
+      { node: 'ad', connector: null, status: 'Safe request is approved for ad injection', delay: 900 },
       { node: null, status: 'Pipeline complete - request processed', delay: 500 }
     ]
   };
@@ -148,12 +149,22 @@
   var animResetBtn = document.getElementById('anim-reset-btn');
 
   var animNodes = {
+    source: document.getElementById('anim-node-source'),
     kafka: document.getElementById('anim-node-kafka'),
     flink: document.getElementById('anim-node-flink'),
     routing: document.getElementById('anim-node-routing'),
     moderation: document.getElementById('anim-node-moderation'),
     ad: document.getElementById('anim-node-ad'),
     spark: document.getElementById('anim-node-spark')
+  };
+
+  var animConnectors = {
+    sourceKafka: document.querySelector('.connector-source-kafka'),
+    kafkaFlink: document.querySelector('.connector-kafka-flink'),
+    flinkRouting: document.querySelector('.connector-flink-routing'),
+    routingModeration: document.querySelector('.connector-routing-moderation'),
+    moderationAd: document.querySelector('.connector-moderation-ad'),
+    sparkRouting: document.querySelector('.connector-spark-routing')
   };
 
   function resetAnimation() {
@@ -175,6 +186,9 @@
     Object.keys(animNodes).forEach(function (key) {
       if (animNodes[key]) animNodes[key].classList.remove('active');
     });
+    Object.keys(animConnectors).forEach(function (key) {
+      if (animConnectors[key]) animConnectors[key].classList.remove('active');
+    });
   }
 
   function runAnimationStep() {
@@ -194,12 +208,15 @@
     if (animStatusText) animStatusText.textContent = stepData.status;
 
     if (animReq && stepData.node) {
-      animReq.className = 'anim-request active at-' + stepData.node;
+      animReq.className = 'anim-request active';
       animReq.style.opacity = '1';
     }
 
     if (stepData.node && animNodes[stepData.node]) {
       animNodes[stepData.node].classList.add('active');
+    }
+    if (stepData.connector && animConnectors[stepData.connector]) {
+      animConnectors[stepData.connector].classList.add('active');
     }
 
     animState.step++;

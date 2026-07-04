@@ -104,6 +104,19 @@
               stream routing, prompt moderation, and offline risk-model training.
             </p>
 
+            <div class="hero-meta" aria-label="Project author and affiliation">
+              <div class="hero-author-row">
+                <a href="https://github.com/IamMistake" target="_blank" rel="noopener">Nikola Jagurinoski</a>
+                <span class="hero-contribution">Fully made by me</span>
+              </div>
+              <div class="hero-affiliation-row">
+                <span><sup>1</sup> FINKI, University of Ss. Cyril and Methodius</span>
+              </div>
+              <div class="hero-contact-row">
+                <a href="mailto:jagurinoskini@gmail.com"><i class="fa-regular fa-envelope"></i> jagurinoskini@gmail.com</a>
+              </div>
+            </div>
+
             <div class="pub-links">
               <a href="#pipeline" class="pub-btn">
                 <span class="icon"><i class="fa-solid fa-sitemap"></i></span>
@@ -161,11 +174,6 @@
       <div class="container">
         <span class="rm-eyebrow"><i class="fa-solid fa-compass"></i> Abstract</span>
         <h2 class="rm-section-title">Overview</h2>
-        <p class="rm-section-sub">
-          Fully made by <a href="https://github.com/IamMistake" target="_blank" rel="noopener"><strong>Nikola Jagurinoski</strong></a>
-          &middot; <a href="https://www.finki.ukim.mk" target="_blank" rel="noopener">FINKI</a>, University of Ss. Cyril and Methodius
-          &middot; <a href="mailto:jagurinoskini@gmail.com"><i class="fa-regular fa-envelope"></i> jagurinoskini@gmail.com</a>
-        </p>
         <p class="rm-section-sub">
           This pipeline is the fraud and content-safety layer for
           <a href="https://adstract.ai" target="_blank" rel="noopener"><strong>Adstract AI</strong></a>
@@ -485,32 +493,37 @@
           and sends unsafe requests to <code>requests.fraud</code>.
         </p>
 
-        <figure class="moderation-diagram">
+        <figure class="moderation-diagram compact-diagram">
           <img src="assets/images/moderation-excalidraw.png" class="moderation-svg"
             alt="Moderation flow diagram showing TF-IDF similarity gating, OpenAI fallback, and routing decisions.">
         </figure>
 
-        <div class="moderation-flow">
-          <h3>Flow</h3>
-          <div class="moderation-flow-diagram">
-            <pre><code class="language-text">requests.clean
-  &rarr; Moderation
-      &rarr; low similarity, no audit
-          &rarr; ad.injection
-
-      &rarr; high similarity
-          &rarr; OpenAI final check
-              &rarr; clean &rarr; ad.injection
-              &rarr; flagged &rarr; requests.fraud
-
-      &rarr; low similarity, audit selected (2%)
-          &rarr; OpenAI final check
-              &rarr; clean &rarr; ad.injection
-              &rarr; flagged &rarr; requests.fraud
-
-      &rarr; OpenAI error
-          &rarr; ad.injection
-          &rarr; marked as openai_error_allow</code></pre>
+        <div class="moderation-flow-card">
+          <div class="moderation-flow-head">
+            <span class="flow-chip"><i class="fa-solid fa-route"></i> Flow</span>
+            <h3>From clean fraud verdict to final ad safety decision</h3>
+          </div>
+          <div class="moderation-path-grid">
+            <article class="moderation-path-card safe-path">
+              <span class="path-label">Low similarity, no audit</span>
+              <h4>Allow directly</h4>
+              <p><code>requests.clean</code> enters moderation, similarity stays below threshold, and the event moves to <code>ad.injection</code>.</p>
+            </article>
+            <article class="moderation-path-card review-path">
+              <span class="path-label">High similarity</span>
+              <h4>OpenAI final check</h4>
+              <p>Risky prompts are escalated. Clean verdicts continue to <code>ad.injection</code>; flagged verdicts go to <code>requests.fraud</code>.</p>
+            </article>
+            <article class="moderation-path-card audit-path">
+              <span class="path-label">2% audit sample</span>
+              <h4>Random quality control</h4>
+              <p>Low-similarity prompts can still be sampled for OpenAI review to catch drift and validate the local TF-IDF gate.</p>
+            </article>
+            <article class="moderation-path-card error-path">
+              <span class="path-label">OpenAI error</span>
+              <h4>Allow with context</h4>
+              <p>OpenAI failures are allowed to <code>ad.injection</code> but marked as <code>openai_error_allow</code> for downstream observability.</p>
+            </article>
           </div>
         </div>
 
@@ -759,47 +772,46 @@
               <div class="anim-req-label">Request</div>
             </div>
 
+            <div class="anim-node anim-source" id="anim-node-source">
+              <div class="anim-node-icon"><i class="fa-solid fa-database"></i></div>
+              <div class="anim-node-label">Real Data<br><small>fraud injected</small></div>
+            </div>
+            <div class="anim-connector connector-source-kafka"></div>
+
             <div class="anim-node anim-kafka" id="anim-node-kafka">
               <div class="anim-node-icon"><i class="fa-solid fa-stream"></i></div>
               <div class="anim-node-label">Kafka<br><small>requests.raw</small></div>
             </div>
+            <div class="anim-connector connector-kafka-flink"></div>
 
             <div class="anim-node anim-flink" id="anim-node-flink">
               <div class="anim-node-icon"><i class="fa-solid fa-shield-halved"></i></div>
               <div class="anim-node-label">Flink<br><small>Fraud Detection</small></div>
             </div>
+            <div class="anim-connector connector-flink-routing"></div>
 
             <div class="anim-node anim-routing" id="anim-node-routing">
               <div class="anim-node-icon"><i class="fa-solid fa-code-branch"></i></div>
               <div class="anim-node-label">Routing</div>
             </div>
+            <div class="anim-connector connector-routing-moderation"></div>
 
             <div class="anim-node anim-moderation" id="anim-node-moderation">
               <div class="anim-node-icon"><i class="fa-solid fa-filter"></i></div>
               <div class="anim-node-label">Moderation</div>
             </div>
+            <div class="anim-connector connector-moderation-ad"></div>
 
             <div class="anim-node anim-ad" id="anim-node-ad">
               <div class="anim-node-icon"><i class="fa-solid fa-bullhorn"></i></div>
               <div class="anim-node-label">Ad Injection</div>
             </div>
 
+            <div class="anim-connector connector-spark-routing"></div>
             <div class="anim-node anim-spark" id="anim-node-spark">
               <div class="anim-node-icon"><i class="fa-solid fa-brain"></i></div>
               <div class="anim-node-label">Spark<br><small>ML Training</small></div>
             </div>
-
-            <!-- Path lines -->
-            <svg class="anim-paths" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet">
-              <!-- Main flow line -->
-              <path class="anim-path-main" id="anim-path-main" d="M 30 250 L 130 250 L 130 130 L 270 130 L 270 250 L 410 250 L 410 370 L 550 370" fill="none" stroke-width="3" />
-              <!-- Routing branches -->
-              <path class="anim-path-branch" id="anim-path-branch-sus" d="M 270 250 L 270 370 L 550 370" fill="none" stroke-width="2" stroke-dasharray="6,4" />
-              <path class="anim-path-branch" id="anim-path-branch-clean" d="M 270 250 L 410 250" fill="none" stroke-width="2" stroke-dasharray="6,4" />
-              <path class="anim-path-branch" id="anim-path-branch-fraud" d="M 410 370 L 550 370" fill="none" stroke-width="2" stroke-dasharray="6,4" />
-              <!-- Spark offline -->
-              <path class="anim-path-offline" id="anim-path-offline" d="M 410 370 L 550 130 L 680 130 L 680 250" fill="none" stroke-width="2" stroke-dasharray="4,4" />
-            </svg>
           </div>
 
           <div class="anim-status" id="anim-status">
