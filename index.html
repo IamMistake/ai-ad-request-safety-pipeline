@@ -45,7 +45,7 @@
           <a href="#moderation" class="toc-link"><i class="fa-solid fa-filter"></i> Moderation</a>
           <a href="#spark" class="toc-link"><i class="fa-solid fa-brain"></i> Spark ML</a>
           <a href="#results" class="toc-link"><i class="fa-solid fa-chart-bar"></i> Results</a>
-          <a href="#pipeline-view" class="toc-link"><i class="fa-solid fa-play"></i> Pipeline View</a>
+          <a href="#pipeline-view" class="toc-link"><i class="fa-solid fa-play"></i> Visualization</a>
           <a href="#quickstart" class="toc-link"><i class="fa-solid fa-rocket"></i> Quick Start</a>
         </div>
       </div>
@@ -715,52 +715,29 @@
         <h2 class="rm-section-title">Getting Started</h2>
         <p class="rm-section-sub">Run the full pipeline locally in a few steps.</p>
 
-        <div class="quickstart-steps">
-          <div class="qs-step">
-            <div class="qs-header"><span class="qs-badge">Pre-reqs</span></div>
-            <pre><code class="language-bash"># Python 3.10+
-                # Docker + Docker Compose</code></pre>
+        <div class="quickstart-grid">
+          <div class="qs-card">
+            <div class="qs-icon"><i class="fa-solid fa-box"></i></div>
+            <h4>Prerequisites</h4>
+            <pre><code class="language-bash"># Python 3.10+ / Docker + Compose
+pip install -r requirements.txt
+docker-compose up -d</code></pre>
           </div>
-          <div class="qs-step">
-            <div class="qs-header"><span class="qs-badge">1</span> Start infrastructure</div>
-            <pre><code class="language-bash">docker-compose up -d</code></pre>
+          <div class="qs-card">
+            <div class="qs-icon"><i class="fa-solid fa-terminal"></i></div>
+            <h4>Run Pipeline</h4>
+            <pre><code class="language-bash"># 4 terminals:
+python kafka/producers/request_simulator.py
+python flink_service/fraud_detection.py
+python pipeline_consumers/moderation_consumer.py
+python test_consumer.py</code></pre>
           </div>
-          <div class="qs-step">
-            <div class="qs-header"><span class="qs-badge">2</span> Install dependencies</div>
-            <pre><code class="language-bash">pip install -r requirements.txt</code></pre>
-          </div>
-          <div class="qs-step">
-            <div class="qs-header"><span class="qs-badge">3</span> Transform dataset</div>
-            <pre><code class="language-bash">python scripts/transform_wildchat_user_prompts.py</code></pre>
-          </div>
-          <div class="qs-step">
-            <div class="qs-header"><span class="qs-badge">4</span> Run the pipeline</div>
-            <pre><code class="language-bash"># Terminal 1: Live request stream
-                python kafka/producers/request_simulator.py
-
-                # Terminal 2: Flink fraud detection
-                python flink_service/fraud_detection.py
-
-                # Terminal 3: Moderation consumer
-                python pipeline_consumers/moderation_consumer.py
-
-                # Terminal 4: Debug consumer
-                python test_consumer.py</code></pre>
-          </div>
-          <div class="qs-step">
-            <div class="qs-header"><span class="qs-badge">5</span> Run pipeline tests</div>
+          <div class="qs-card">
+            <div class="qs-icon"><i class="fa-solid fa-microchip"></i></div>
+            <h4>Test &amp; Train</h4>
             <pre><code class="language-bash">./scripts/test_full_pipeline.sh
-                ./scripts/test_fraud_block_flow.sh
-                ./scripts/test_moderation_block_flow.sh</code></pre>
-          </div>
-          <div class="qs-step">
-            <div class="qs-header"><span class="qs-badge">6</span> Spark training</div>
-            <pre><code class="language-bash"># Export historical logs
-                python spark_service/historical_exporter.py \
-                --from-beginning --idle-seconds 30
-
-                # Run training
-                python spark_service/spark_training.py</code></pre>
+python spark_service/historical_exporter.py
+python spark_service/spark_training.py</code></pre>
           </div>
         </div>
       </div>
