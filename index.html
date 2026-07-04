@@ -195,7 +195,7 @@
             before reaching the Adstract ad injection layer.
           </p>
           <p>
-            Key components include a request simulator, five Kafka topics
+            Key components include a live request stream, five Kafka topics
             for pipeline decoupling, Flink-based real-time fraud detection with watermarking and keyed state,
             a moderation service supporting both TF-IDF similarity gating and OpenAI API modes, and a Spark ML pipeline
             that trains and serializes fraud classification models from historical pipeline logs.
@@ -244,11 +244,11 @@
         <div class="pipeline-container">
           <figure class="pipeline-figure">
             <img src="assets/images/pipeline-architecture-excalidraw.png" class="pipeline-svg"
-              alt="Architecture pipeline diagram showing the full data flow from Request Simulator through Kafka, Flink, RFC Scoring, Moderation, Ad Injection, and Spark.">
+              alt="Architecture pipeline diagram showing the full data flow from real traffic data through Kafka, Flink, RFC Scoring, Moderation, Ad Injection, and Spark.">
           </figure>
           <div class="pipeline-legend">
-            <button class="legend-item" data-component="simulator"><span class="legend-dot"
-                style="--dot-color:#14b8a6"></span> Simulator</button>
+            <button class="legend-item" data-component="source"><span class="legend-dot"
+                style="--dot-color:#14b8a6"></span> Data Source</button>
             <button class="legend-item" data-component="kafka"><span class="legend-dot"
                 style="--dot-color:#f59e0b"></span> Kafka</button>
             <button class="legend-item" data-component="flink"><span class="legend-dot"
@@ -269,7 +269,7 @@
           <div class="flow-step" style="--fs-color:#14b8a6">
             <span class="fs-num">1</span>
             <div class="fs-content">
-              <h4>Request Simulator</h4>
+              <h4>Live Request Stream</h4>
               <p>Streams real ad request traffic from real GPT conversation data (WildChat, 175k prompts) with
                 fraud requests injected for controlled evaluation. Supports normal and fraud traffic profiles
                 with configurable burst and bot patterns.</p>
@@ -725,7 +725,7 @@
           </div>
           <div class="qs-step">
             <div class="qs-header"><span class="qs-badge">4</span> Run the pipeline</div>
-            <pre><code class="language-bash"># Terminal 1: Request simulator
+            <pre><code class="language-bash"># Terminal 1: Live request stream
                 python kafka/producers/request_simulator.py
 
                 # Terminal 2: Flink fraud detection

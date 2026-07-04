@@ -9,8 +9,8 @@
   if (!detailEl) return;
 
   var components = {
-    simulator: {
-      title: 'Request Simulator',
+    source: {
+      title: 'Live Request Stream',
       desc: 'Streams real ad request traffic from the WildChat dataset (175k real GPT conversations) with fraud requests injected for controlled evaluation. Each request is enriched with session context, user agent, IP geolocation (GeoLite2), and ASN. Supports normal and fraud traffic profiles for controlled experiments.',
       file: 'kafka/producers/request_simulator.py'
     },
