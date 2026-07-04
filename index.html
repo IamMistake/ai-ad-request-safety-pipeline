@@ -767,50 +767,71 @@
 
         <div class="pipeline-animation" id="pipeline-animation">
           <div class="anim-stage" id="anim-stage">
-            <div class="anim-request" id="anim-request">
-              <div class="anim-req-icon"><i class="fa-solid fa-paper-plane"></i></div>
-              <div class="anim-req-label">Request</div>
+            <div class="anim-round-badge" id="anim-round-badge">Request <span id="anim-round-num">#1</span></div>
+
+            <div class="anim-flow-row" id="anim-flow-row">
+              <div class="anim-unit" id="anim-unit-source">
+                <div class="anim-node-icon"><i class="fa-solid fa-database"></i></div>
+                <div class="anim-node-label">Real Data<br><small>fraud injected</small></div>
+                <div class="anim-step-label">Preparing request<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              </div>
+
+              <div class="anim-link" id="anim-link-source-kafka" aria-hidden="true"><span class="pulse-dot"></span></div>
+
+              <div class="anim-unit" id="anim-unit-kafka">
+                <div class="anim-node-icon"><i class="fa-solid fa-stream"></i></div>
+                <div class="anim-node-label">Kafka<br><small>requests.raw</small></div>
+                <div class="anim-step-label">Buffering event<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              </div>
+
+              <div class="anim-link" id="anim-link-kafka-flink" aria-hidden="true"><span class="pulse-dot"></span></div>
+
+              <div class="anim-unit" id="anim-unit-flink">
+                <div class="anim-node-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="anim-node-label">Flink<br><small>Fraud Detection</small></div>
+                <div class="anim-step-label">Scoring fraud signals<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              </div>
+
+              <div class="anim-link" id="anim-link-flink-rfc" aria-hidden="true"><span class="pulse-dot"></span></div>
+
+              <div class="anim-unit" id="anim-unit-rfc">
+                <div class="anim-node-icon"><i class="fa-solid fa-tree"></i></div>
+                <div class="anim-node-label">RFC<br><small>suspicious scoring</small></div>
+                <div class="anim-step-label">Resolving borderline risk<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              </div>
+
+              <div class="anim-link" id="anim-link-rfc-moderation" aria-hidden="true"><span class="pulse-dot"></span></div>
+
+              <div class="anim-unit" id="anim-unit-moderation">
+                <div class="anim-node-icon"><i class="fa-solid fa-filter"></i></div>
+                <div class="anim-node-label">Moderation<br><small>prompt safety</small></div>
+                <div class="anim-step-label">Checking content<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              </div>
+
+              <div class="anim-link" id="anim-link-moderation-ad" aria-hidden="true"><span class="pulse-dot"></span></div>
+
+              <div class="anim-unit" id="anim-unit-ad">
+                <div class="anim-node-icon"><i class="fa-solid fa-bullhorn"></i></div>
+                <div class="anim-node-label">Ad Injection<br><small>approved</small></div>
+                <div class="anim-step-label">Publishing decision<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              </div>
             </div>
 
-            <div class="anim-node anim-source" id="anim-node-source">
-              <div class="anim-node-icon"><i class="fa-solid fa-database"></i></div>
-              <div class="anim-node-label">Real Data<br><small>fraud injected</small></div>
-            </div>
-            <div class="anim-connector connector-source-kafka"></div>
-
-            <div class="anim-node anim-kafka" id="anim-node-kafka">
-              <div class="anim-node-icon"><i class="fa-solid fa-stream"></i></div>
-              <div class="anim-node-label">Kafka<br><small>requests.raw</small></div>
-            </div>
-            <div class="anim-connector connector-kafka-flink"></div>
-
-            <div class="anim-node anim-flink" id="anim-node-flink">
-              <div class="anim-node-icon"><i class="fa-solid fa-shield-halved"></i></div>
-              <div class="anim-node-label">Flink<br><small>Fraud Detection</small></div>
-            </div>
-            <div class="anim-connector connector-flink-routing"></div>
-
-            <div class="anim-node anim-routing" id="anim-node-routing">
-              <div class="anim-node-icon"><i class="fa-solid fa-code-branch"></i></div>
-              <div class="anim-node-label">Routing</div>
-            </div>
-            <div class="anim-connector connector-routing-moderation"></div>
-
-            <div class="anim-node anim-moderation" id="anim-node-moderation">
-              <div class="anim-node-icon"><i class="fa-solid fa-filter"></i></div>
-              <div class="anim-node-label">Moderation</div>
-            </div>
-            <div class="anim-connector connector-moderation-ad"></div>
-
-            <div class="anim-node anim-ad" id="anim-node-ad">
-              <div class="anim-node-icon"><i class="fa-solid fa-bullhorn"></i></div>
-              <div class="anim-node-label">Ad Injection</div>
+            <div class="anim-support-row">
+              <div class="anim-support-card" id="anim-unit-spark">
+                <i class="fa-solid fa-brain"></i>
+                <span>Spark trains the RandomForest context used by suspicious-request scoring.</span>
+              </div>
+              <div class="anim-loop-chip" id="anim-loop-chip">
+                <i class="fa-solid fa-rotate"></i>
+                <span>Next request</span><span class="dots"><span>.</span><span>.</span><span>.</span></span>
+              </div>
             </div>
 
-            <div class="anim-connector connector-spark-routing"></div>
-            <div class="anim-node anim-spark" id="anim-node-spark">
-              <div class="anim-node-icon"><i class="fa-solid fa-brain"></i></div>
-              <div class="anim-node-label">Spark<br><small>ML Training</small></div>
+            <div class="anim-output" id="anim-output" aria-live="polite">
+              <div class="anim-output-label"><i class="fa-solid fa-terminal"></i> Pipeline trace</div>
+              <div class="anim-output-text" id="anim-output-text">Waiting for a request...</div>
+              <span class="anim-cursor" id="anim-cursor"></span>
             </div>
           </div>
 

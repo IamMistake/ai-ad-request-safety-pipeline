@@ -22,10 +22,13 @@ The site presents a security/data pipeline as a polished safety-systems product 
 - Diagram/cards/tables: rounded technical cards with one consistent light direction and restrained accent colors.
 - Hero metadata row: centered/link-forward author, affiliation, contribution, and contact line in the academic-project-page style.
 - Compact diagram frame: large source diagrams render inside centered, max-width figure cards instead of occupying the full content width.
-- Interactive pipeline view: dark, grid-aligned operational map with visible connector rails and stateful node illumination.
+- Interactive pipeline view: dark staged request loop with active processing units, connector pulse travel, request counter, loop chip, and terminal-style trace output.
 
 ## Motion and States
 
 - Motion only communicates affordance or entrance. Use `transform` and `opacity`; no layout-property animation.
 - Hover states lift or illuminate interactive controls. Focus states must remain visible.
 - Reduced-motion users receive static visible content.
+- Pipeline animation units use `translateY(-10px) scale(1.06)` plus indigo/cyan glow to show the active stage.
+- Connector pulses travel for `0.78s ease-in-out`; request badges use a short `scale(1.06)` bump when the next request begins.
+- Trace output uses JetBrains Mono, green cursor blink, and short streamed status lines instead of decorative motion.

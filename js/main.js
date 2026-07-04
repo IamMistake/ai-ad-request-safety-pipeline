@@ -127,116 +127,162 @@
   });
 
   // --- Interactive Pipeline Animation ---
+  var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var animState = {
     running: false,
-    step: 0,
-    timer: null,
+    requestNum: 1,
+    cancelToken: 0,
     steps: [
-      { node: 'source', connector: 'sourceKafka', status: 'Real traffic enters with injected fraud requests', delay: 900 },
-      { node: 'kafka', connector: 'kafkaFlink', status: 'Kafka stores the event in requests.raw', delay: 900 },
-      { node: 'flink', connector: 'flinkRouting', status: 'Flink evaluates stateful fraud signals', delay: 1100 },
-      { node: 'spark', connector: 'sparkRouting', status: 'Spark-trained model context supports suspicious scoring', delay: 800 },
-      { node: 'routing', connector: 'routingModeration', status: 'Clean fraud verdict moves to moderation', delay: 850 },
-      { node: 'moderation', connector: 'moderationAd', status: 'Moderation checks prompt safety', delay: 1100 },
-      { node: 'ad', connector: null, status: 'Safe request is approved for ad injection', delay: 900 },
-      { node: null, status: 'Pipeline complete - request processed', delay: 500 }
+      { node: 'source', link: 'sourceKafka', status: 'Real traffic data enters with fraud injected', trace: 'ingest: WildChat request + fraud profile attached', delay: 760 },
+      { node: 'kafka', link: 'kafkaFlink', status: 'Kafka records the event in requests.raw', trace: 'topic: requests.raw -> partitioned event stream', delay: 760 },
+      { node: 'flink', link: 'flinkRfc', status: 'Flink evaluates stateful fraud signals', trace: 'flink: user/session/publisher risk signals updated', delay: 900 },
+      { node: 'rfc', link: 'rfcModeration', status: 'RFC scoring resolves suspicious requests', trace: 'rfc: RandomForest context scores borderline traffic', delay: 780 },
+      { node: 'moderation', link: 'moderationAd', status: 'Moderation checks prompt safety', trace: 'moderation: TF-IDF gate + OpenAI escalation when needed', delay: 920 },
+      { node: 'ad', link: null, status: 'Safe request approved for ad injection', trace: 'ad.injection: approved request ready for sponsored suggestion', delay: 820 }
     ]
   };
 
-  var animReq = document.getElementById('anim-request');
   var animStatusText = document.getElementById('anim-status-text');
   var animPlayBtn = document.getElementById('anim-play-btn');
   var animResetBtn = document.getElementById('anim-reset-btn');
+  var animRoundBadge = document.getElementById('anim-round-badge');
+  var animRoundNum = document.getElementById('anim-round-num');
+  var animLoopChip = document.getElementById('anim-loop-chip');
+  var animOutputText = document.getElementById('anim-output-text');
+  var animCursor = document.getElementById('anim-cursor');
+  var animSpark = document.getElementById('anim-unit-spark');
 
   var animNodes = {
-    source: document.getElementById('anim-node-source'),
-    kafka: document.getElementById('anim-node-kafka'),
-    flink: document.getElementById('anim-node-flink'),
-    routing: document.getElementById('anim-node-routing'),
-    moderation: document.getElementById('anim-node-moderation'),
-    ad: document.getElementById('anim-node-ad'),
-    spark: document.getElementById('anim-node-spark')
+    source: document.getElementById('anim-unit-source'),
+    kafka: document.getElementById('anim-unit-kafka'),
+    flink: document.getElementById('anim-unit-flink'),
+    rfc: document.getElementById('anim-unit-rfc'),
+    moderation: document.getElementById('anim-unit-moderation'),
+    ad: document.getElementById('anim-unit-ad')
   };
 
-  var animConnectors = {
-    sourceKafka: document.querySelector('.connector-source-kafka'),
-    kafkaFlink: document.querySelector('.connector-kafka-flink'),
-    flinkRouting: document.querySelector('.connector-flink-routing'),
-    routingModeration: document.querySelector('.connector-routing-moderation'),
-    moderationAd: document.querySelector('.connector-moderation-ad'),
-    sparkRouting: document.querySelector('.connector-spark-routing')
+  var animLinks = {
+    sourceKafka: document.getElementById('anim-link-source-kafka'),
+    kafkaFlink: document.getElementById('anim-link-kafka-flink'),
+    flinkRfc: document.getElementById('anim-link-flink-rfc'),
+    rfcModeration: document.getElementById('anim-link-rfc-moderation'),
+    moderationAd: document.getElementById('anim-link-moderation-ad')
   };
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, prefersReducedMotion ? Math.min(ms, 80) : ms);
+    });
+  }
+
+  function setRoundBadge(num) {
+    if (animRoundNum) animRoundNum.textContent = '#' + num;
+    if (!animRoundBadge) return;
+    animRoundBadge.classList.remove('pulsing');
+    void animRoundBadge.offsetWidth;
+    animRoundBadge.classList.add('pulsing');
+  }
+
+  function clearActiveState() {
+    Object.keys(animNodes).forEach(function (key) {
+      if (animNodes[key]) animNodes[key].classList.remove('active');
+    });
+    Object.keys(animLinks).forEach(function (key) {
+      if (animLinks[key]) animLinks[key].classList.remove('active');
+    });
+    if (animSpark) animSpark.classList.remove('active');
+    if (animLoopChip) animLoopChip.classList.remove('show');
+  }
+
+  function pulseLink(linkKey) {
+    var link = animLinks[linkKey];
+    if (!link) return;
+    link.classList.remove('active');
+    void link.offsetWidth;
+    link.classList.add('active');
+  }
+
+  async function streamTrace(text, token) {
+    if (!animOutputText) return;
+    if (animCursor) animCursor.classList.add('show');
+    animOutputText.textContent = '';
+
+    if (prefersReducedMotion) {
+      animOutputText.textContent = text;
+      if (animCursor) animCursor.classList.remove('show');
+      return;
+    }
+
+    for (var i = 0; i < text.length; i += 2) {
+      if (token !== animState.cancelToken) return;
+      animOutputText.textContent += text.slice(i, i + 2);
+      await sleep(12);
+    }
+    if (animCursor) animCursor.classList.remove('show');
+  }
+
+  async function runRequest(token) {
+    setRoundBadge(animState.requestNum);
+    if (animStatusText) animStatusText.textContent = 'Request #' + animState.requestNum + ' entering pipeline';
+    if (animLoopChip) animLoopChip.classList.remove('show');
+    if (animSpark) animSpark.classList.add('active');
+    await sleep(220);
+
+    for (var i = 0; i < animState.steps.length; i++) {
+      if (!animState.running || token !== animState.cancelToken) return;
+      var step = animState.steps[i];
+      var node = animNodes[step.node];
+
+      clearActiveState();
+      if (animSpark && (step.node === 'flink' || step.node === 'rfc')) animSpark.classList.add('active');
+      if (node) node.classList.add('active');
+      if (step.link) pulseLink(step.link);
+      if (animStatusText) animStatusText.textContent = step.status;
+
+      await Promise.all([
+        streamTrace('request #' + animState.requestNum + ' / ' + step.trace, token),
+        sleep(step.delay)
+      ]);
+    }
+
+    if (!animState.running || token !== animState.cancelToken) return;
+    clearActiveState();
+    if (animStatusText) animStatusText.textContent = 'Pipeline complete - request approved';
+    await streamTrace('complete: request #' + animState.requestNum + ' safely routed to ad.injection', token);
+    if (animLoopChip) animLoopChip.classList.add('show');
+    animState.requestNum++;
+    await sleep(950);
+  }
 
   function resetAnimation() {
-    if (animState.timer) {
-      clearTimeout(animState.timer);
-      animState.timer = null;
-    }
+    animState.cancelToken++;
     animState.running = false;
-    animState.step = 0;
+    animState.requestNum = 1;
     if (animPlayBtn) {
       animPlayBtn.disabled = false;
       animPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i> Play';
     }
-    if (animReq) {
-      animReq.className = 'anim-request';
-      animReq.style.opacity = '0';
-    }
+    clearActiveState();
+    if (animRoundNum) animRoundNum.textContent = '#1';
+    if (animRoundBadge) animRoundBadge.classList.remove('pulsing');
     if (animStatusText) animStatusText.textContent = 'Ready';
-    Object.keys(animNodes).forEach(function (key) {
-      if (animNodes[key]) animNodes[key].classList.remove('active');
-    });
-    Object.keys(animConnectors).forEach(function (key) {
-      if (animConnectors[key]) animConnectors[key].classList.remove('active');
-    });
+    if (animOutputText) animOutputText.textContent = 'Waiting for a request...';
+    if (animCursor) animCursor.classList.remove('show');
   }
 
-  function runAnimationStep() {
-    if (!animState.running) return;
-
-    var stepData = animState.steps[animState.step];
-    if (!stepData) {
-      if (animStatusText) animStatusText.textContent = 'All requests processed successfully';
-      if (animPlayBtn) {
-        animPlayBtn.disabled = false;
-        animPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i> Play';
-      }
-      animState.running = false;
-      return;
-    }
-
-    if (animStatusText) animStatusText.textContent = stepData.status;
-
-    if (animReq && stepData.node) {
-      animReq.className = 'anim-request active';
-      animReq.style.opacity = '1';
-    }
-
-    if (stepData.node && animNodes[stepData.node]) {
-      animNodes[stepData.node].classList.add('active');
-    }
-    if (stepData.connector && animConnectors[stepData.connector]) {
-      animConnectors[stepData.connector].classList.add('active');
-    }
-
-    animState.step++;
-    animState.timer = setTimeout(runAnimationStep, stepData.delay);
-  }
-
-  function startAnimation() {
+  async function startAnimation() {
     if (animState.running) return;
     resetAnimation();
     animState.running = true;
-    animState.step = 0;
+    var token = ++animState.cancelToken;
     if (animPlayBtn) {
       animPlayBtn.disabled = true;
       animPlayBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Playing';
     }
-    if (animReq) {
-      animReq.className = 'anim-request';
-      animReq.style.opacity = '0';
+
+    while (animState.running && token === animState.cancelToken) {
+      await runRequest(token);
     }
-    runAnimationStep();
   }
 
   if (animPlayBtn) {
