@@ -34,7 +34,7 @@
     <div class="toc-rail is-collapsed" id="toc-rail">
       <div class="toc-inner">
         <button class="toc-head" id="toc-toggle" aria-label="Toggle table of contents">
-          <span class="toc-badge"><i class="fa-solid fa-shield-halved"></i></span>
+          <span class="toc-badge"><i class="fa-solid fa-bars"></i></span>
           <span class="toc-title"><span class="toc-long">Contents</span></span>
           <span class="toc-expand"><i class="fa-solid fa-angle-up"></i></span>
         </button>
@@ -45,11 +45,47 @@
           <a href="#moderation" class="toc-link"><i class="fa-solid fa-filter"></i> Moderation</a>
           <a href="#spark" class="toc-link"><i class="fa-solid fa-brain"></i> Spark ML</a>
           <a href="#results" class="toc-link"><i class="fa-solid fa-chart-bar"></i> Results</a>
+          <a href="#pipeline-view" class="toc-link"><i class="fa-solid fa-play"></i> Pipeline View</a>
           <a href="#quickstart" class="toc-link"><i class="fa-solid fa-rocket"></i> Quick Start</a>
         </div>
       </div>
     </div>
   </nav>
+
+  <!-- ====== MORE WORKS FLOATING BUTTON ====== -->
+  <div class="more-works-container">
+    <button class="more-works-btn" onclick="toggleMoreWorks()" title="Other Projects" aria-label="Other works">
+      <i class="fa-solid fa-flask"></i>
+      <span class="more-works-text">Other Works</span>
+      <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+    </button>
+    <div class="more-works-dropdown" id="moreWorksDropdown">
+      <div class="dropdown-header">
+        <h4>Other Works</h4>
+        <button class="close-btn" onclick="toggleMoreWorks()" aria-label="Close">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="works-list">
+        <a href="https://adstract.ai" class="work-item" target="_blank" rel="noopener">
+          <div class="work-info">
+            <h5>Adstract AI</h5>
+            <p>AI ad network &mdash; context-aware sponsored suggestions inside chat</p>
+            <span class="work-venue">adstract.ai</span>
+          </div>
+          <i class="fa-solid fa-external-link-alt"></i>
+        </a>
+        <a href="https://github.com/IamMistake" class="work-item" target="_blank" rel="noopener">
+          <div class="work-info">
+            <h5>GitHub &mdash; Nikola Jagurinoski</h5>
+            <p>More projects and open-source work</p>
+            <span class="work-venue">@IamMistake</span>
+          </div>
+          <i class="fa-solid fa-external-link-alt"></i>
+        </a>
+      </div>
+    </div>
+  </div>
 
   <!-- ====== MAIN CONTENT ====== -->
   <main>
@@ -59,11 +95,12 @@
       <div class="container">
         <div class="hero-layout">
           <div class="hero-copy">
-            <span class="pub-eyebrow"><i class="fa-solid fa-graduation-cap"></i> Massive Data Mining &middot; University
-              Project</span>
+            <span class="pub-eyebrow"><i class="fa-solid fa-graduation-cap"></i> Massive Data Mining &middot; FINKI</span>
             <h1 class="pub-title">AI Ad Request <br>Safety Pipeline</h1>
             <p class="pub-subtitle">
-              A real-time safety pipeline for AI advertising requests: fraud signals, suspicious
+              A real-time safety pipeline for
+              <a href="https://adstract.ai" target="_blank" rel="noopener">Adstract AI</a>
+              ad requests: fraud signals, suspicious
               stream routing, prompt moderation, and offline risk-model training.
             </p>
 
@@ -100,8 +137,8 @@
 
         <div class="metrics-strip">
           <div class="metric-card">
-            <span class="metric-num">14</span>
-            <div class="metric-label">Fraud Rules</div>
+            <span class="metric-num">30%</span>
+            <div class="metric-label">Blocked (Fraud) Requests</div>
           </div>
           <div class="metric-card">
             <span class="metric-num">5</span>
@@ -125,8 +162,16 @@
         <span class="rm-eyebrow"><i class="fa-solid fa-compass"></i> Abstract</span>
         <h2 class="rm-section-title">Overview</h2>
         <p class="rm-section-sub">
-          AI-powered platforms increasingly inject sponsored content into their responses, creating
-          a new attack surface where bad actors craft requests that commit fraud or inject unsafe content.
+          Fully made by <a href="https://github.com/IamMistake" target="_blank" rel="noopener"><strong>Nikola Jagurinoski</strong></a>
+          &middot; <a href="https://www.finki.ukim.mk" target="_blank" rel="noopener">FINKI</a>, University of Ss. Cyril and Methodius
+          &middot; <a href="mailto:jagurinoskini@gmail.com"><i class="fa-regular fa-envelope"></i> jagurinoskini@gmail.com</a>
+        </p>
+        <p class="rm-section-sub">
+          This pipeline is the fraud and content-safety layer for
+          <a href="https://adstract.ai" target="_blank" rel="noopener"><strong>Adstract AI</strong></a>
+          &mdash; an AI ad network that serves context-aware sponsored suggestions inside chat.
+          Ad networks face a double threat: <strong>publishers inflating requests with fake traffic</strong>
+          and <strong>users submitting unsafe or non-advertisable prompts</strong>.
           This pipeline evaluates every request through multiple defense layers before it reaches ad injection.
         </p>
 
@@ -134,16 +179,17 @@
           <p>
             This project builds a <strong>real-time streaming pipeline</strong> that detects fraudulent
             ad requests and moderates unsafe content using <strong>Apache Kafka</strong> as the event backbone,
-            <strong>Apache Flink</strong> for stream processing with 14 stateful fraud detection rules,
-            and <strong>Apache Spark</strong> for offline ML model training. The pipeline simulates realistic
-            ad traffic from 175k real GPT conversations, evaluates each request through multi-scope detectors
-            (user, session, publisher), scores suspicious requests with a RandomForest classifier, and enforces
-            content safety policies before allowing ad injection.
+            <strong>Apache Flink</strong> for stream processing with stateful fraud detection,
+            and <strong>Apache Spark</strong> for offline ML model training. The pipeline uses
+            real traffic data with fraud requests injected to simulate realistic threat patterns.
+            Each request is evaluated through multi-scope detectors
+            (user, session, publisher), scored by a RandomForest classifier, and checked for content safety
+            before reaching the Adstract ad injection layer.
           </p>
           <p>
-            Key components include a request simulator with configurable fraud profiles, five Kafka topics
+            Key components include a request simulator, five Kafka topics
             for pipeline decoupling, Flink-based real-time fraud detection with watermarking and keyed state,
-            a moderation service supporting both local rule-based and OpenAI API modes, and a Spark ML pipeline
+            a moderation service supporting both TF-IDF similarity gating and OpenAI API modes, and a Spark ML pipeline
             that trains and serializes fraud classification models from historical pipeline logs.
           </p>
         </div>
@@ -162,7 +208,7 @@
               <i class="fa-solid fa-layer-group"></i>
             </div>
             <h4>Multi-Stage Detection</h4>
-            <p>Rule-based filtering (14 rules, 3 scopes) followed by optional ML-based RFC scoring for suspicious
+            <p>Rule-based filtering across 3 scopes followed by optional ML-based RFC scoring for suspicious
               requests.</p>
           </div>
           <div class="pillar">
@@ -189,8 +235,8 @@
 
         <div class="pipeline-container">
           <figure class="pipeline-figure">
-            <object type="image/svg+xml" data="assets/diagrams/pipeline.svg" class="pipeline-svg"
-              aria-label="Architecture pipeline diagram showing the full data flow from Request Simulator through Kafka, Flink, RFC Scoring, Moderation, Ad Injection, and Spark."></object>
+            <img src="assets/images/pipeline-architecture-excalidraw.png" class="pipeline-svg"
+              alt="Architecture pipeline diagram showing the full data flow from Request Simulator through Kafka, Flink, RFC Scoring, Moderation, Ad Injection, and Spark.">
           </figure>
           <div class="pipeline-legend">
             <button class="legend-item" data-component="simulator"><span class="legend-dot"
@@ -216,8 +262,9 @@
             <span class="fs-num">1</span>
             <div class="fs-content">
               <h4>Request Simulator</h4>
-              <p>Generates synthetic ad request traffic from real GPT conversation data (WildChat, 175k prompts).
-                Supports normal and fraud traffic profiles with configurable burst and bot patterns.</p>
+              <p>Streams real ad request traffic from real GPT conversation data (WildChat, 175k prompts) with
+                fraud requests injected for controlled evaluation. Supports normal and fraud traffic profiles
+                with configurable burst and bot patterns.</p>
             </div>
           </div>
           <div class="flow-step" style="--fs-color:#f59e0b">
@@ -233,7 +280,7 @@
             <span class="fs-num">3</span>
             <div class="fs-content">
               <h4>Flink Fraud Detection</h4>
-              <p>Assigns event-time watermarks, keys the stream through three stateful detectors (User &rarr; Session
+              <p>Assigns event-time watermarks, keys the stream through three detectors (User &rarr; Session
                 &rarr; Publisher), and routes by score: clean (&lt;0.5), suspicious (0.5&ndash;0.8), or fraud (&ge;0.8).
               </p>
             </div>
@@ -274,13 +321,13 @@
         <span class="rm-eyebrow"><i class="fa-solid fa-shield-halved"></i> Real-Time Detection</span>
         <h2 class="rm-section-title">Fraud Detection</h2>
         <p class="rm-section-sub">
-          Flink evaluates each request through 14 rules across three scopes. Rules are scored incrementally;
-          the final score determines whether the request is clean, suspicious, or fraud.
+          Flink evaluates each request across three scopes — stateless, user/session, and publisher.
+          Rules are scored incrementally; the final score determines whether the request is clean, suspicious, or fraud.
         </p>
 
         <figure class="flink-diagram">
-          <object type="image/svg+xml" data="assets/diagrams/flink-chain.svg" class="flink-svg"
-            aria-label="Flink detector chain diagram showing UserDetector, SessionDetector, PublisherDetector in sequence."></object>
+          <img src="assets/images/fraud-detection-excalidraw.png" class="flink-svg"
+            alt="Flink detector chain diagram showing UserDetector, SessionDetector, PublisherDetector in sequence.">
         </figure>
 
         <div class="fraud-table-wrap">
@@ -432,48 +479,65 @@
         <span class="rm-eyebrow"><i class="fa-solid fa-filter"></i> Content Safety</span>
         <h2 class="rm-section-title">Content Moderation</h2>
         <p class="rm-section-sub">
-          The moderation service analyzes prompt content for safety before forwarding to ad injection.
-          It supports two provider modes.
+          Moderation checks only <code>requests.clean</code>.
+          It compares the incoming prompt against unsafe reference data using TF-IDF + cosine similarity,
+          calls OpenAI only for risky prompts or a 2% audit sample, sends safe requests to <code>ad.injection</code>,
+          and sends unsafe requests to <code>requests.fraud</code>.
         </p>
 
-        <div class="tabs" id="moderation-tabs">
-          <div class="tab-nav" role="tablist" aria-label="Moderation modes">
-            <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-mock" id="tab-btn-mock">
-              <i class="fa-solid fa-microchip"></i> Mock Mode
-            </button>
-            <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-openai" id="tab-btn-openai">
-              <i class="fa-solid fa-cloud"></i> OpenAI Mode
-            </button>
-          </div>
-          <div class="tab-panel active" id="tab-mock" role="tabpanel" aria-labelledby="tab-btn-mock">
-            <h3>Rule-Based Local Moderation</h3>
-            <p>Default mode for local development. Uses keyword patterns, normalization, and TF-IDF similarity to detect
-              unsafe prompts. No external API calls &mdash; fast and repeatable.</p>
-            <pre><code class="language-bash"># No API key needed
-                MODERATION_PROVIDER=mock
+        <figure class="moderation-diagram">
+          <img src="assets/images/moderation-excalidraw.png" class="moderation-svg"
+            alt="Moderation flow diagram showing TF-IDF similarity gating, OpenAI fallback, and routing decisions.">
+        </figure>
 
-                # Uses ModerationAnalyzer with keyword rules
-                # and TF-IDF gating against reference corpus</code></pre>
-          </div>
-          <div class="tab-panel" id="tab-openai" role="tabpanel" aria-labelledby="tab-btn-openai">
-            <h3>OpenAI Moderation API</h3>
-            <p>Calls the OpenAI Moderation API (<code>omni-moderation-latest</code>) for more accurate content safety
-              checks. Requires an API key. Prompt caching avoids redundant calls.</p>
-            <pre><code class="language-bash"># Set in .env
-                MODERATION_PROVIDER=openai
-                OPENAI_API_KEY=sk-...
-                OPENAI_MODERATION_MODEL=omni-moderation-latest</code></pre>
+        <div class="moderation-flow">
+          <h3>Flow</h3>
+          <div class="moderation-flow-diagram">
+            <pre><code class="language-text">requests.clean
+  &rarr; Moderation
+      &rarr; low similarity, no audit
+          &rarr; ad.injection
+
+      &rarr; high similarity
+          &rarr; OpenAI final check
+              &rarr; clean &rarr; ad.injection
+              &rarr; flagged &rarr; requests.fraud
+
+      &rarr; low similarity, audit selected (2%)
+          &rarr; OpenAI final check
+              &rarr; clean &rarr; ad.injection
+              &rarr; flagged &rarr; requests.fraud
+
+      &rarr; OpenAI error
+          &rarr; ad.injection
+          &rarr; marked as openai_error_allow</code></pre>
           </div>
         </div>
 
-        <div class="moderation-flow">
-          <h3>Moderation Flow</h3>
-          <pre><code class="language-text">requests.clean &rarr; ModerationClient.analyze(prompt)
-              |- Check cache (SHA256 normalized prompt)
-              |- Mock/OpenAI analysis
-              '- Route result
-              |- Clean &rarr; ad.injection
-              '- Unsafe &rarr; requests.fraud</code></pre>
+        <div class="moderation-tfidf">
+          <h3><i class="fa-solid fa-calculator"></i> How TF-IDF Works Here</h3>
+          <p>TF-IDF turns text into vectors. Moderation does this:</p>
+          <ol>
+            <li>Load unsafe reference dataset</li>
+            <li>Normalize reference prompts and bad terms</li>
+            <li>Fit TF-IDF vectorizer</li>
+            <li>Precompute reference vectors</li>
+            <li>Normalize incoming prompt</li>
+            <li>Vectorize incoming prompt</li>
+            <li>Calculate cosine similarity</li>
+          </ol>
+          <p>
+            Each incoming prompt is compared to known unsafe examples.
+            If similarity is high, the request is risky.
+          </p>
+          <div class="threshold-box">
+            <span class="threshold-label">Initial threshold:</span>
+            <span class="threshold-value">0.30</span>
+          </div>
+          <p>
+            <code>similarity &ge; 0.30</code> &rarr; risky enough for OpenAI check<br>
+            <code>similarity &lt; 0.30</code> &rarr; probably safe
+          </p>
         </div>
       </div>
     </section>
@@ -679,96 +743,78 @@
       </div>
     </section>
 
-    <!-- ====== IMPLEMENTATION STATUS ====== -->
-    <section id="status" class="section rm-bg-tint">
+    <!-- ====== INTERACTIVE PIPELINE VIEW ====== -->
+    <section id="pipeline-view" class="section pipeline-view-section">
       <div class="container">
-        <span class="rm-eyebrow"><i class="fa-solid fa-list-check"></i> Progress</span>
-        <h2 class="rm-section-title">Implementation Status</h2>
-        <p class="rm-section-sub">Current state of each pipeline component.</p>
-
-        <div class="status-grid">
-          <div class="status-card implemented">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-check-circle"></i></span>
-              <h4>Kafka Infrastructure</h4>
-            </div>
-            <p>Docker Compose with Zookeeper, Kafka broker, Kafka UI. Single-broker dev configuration.</p>
-            <span class="status-badge implemented-badge">Implemented</span>
-          </div>
-          <div class="status-card implemented">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-check-circle"></i></span>
-              <h4>Request Simulator</h4>
-            </div>
-            <p>Streams WildChat prompts through Kafka with geo enrichment. Supports normal/fraud profiles.</p>
-            <span class="status-badge implemented-badge">Implemented</span>
-          </div>
-          <div class="status-card implemented">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-check-circle"></i></span>
-              <h4>Flink Fraud Detection</h4>
-            </div>
-            <p>14 rules across user, session, and publisher scopes. Watermarking + keyed state.</p>
-            <span class="status-badge implemented-badge">Implemented</span>
-          </div>
-          <div class="status-card planned">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-circle"></i></span>
-              <h4>RFC Scoring Service</h4>
-            </div>
-            <p>Consumes <code>requests.sus</code>, loads Spark-trained model, scores suspicious requests. Not yet built.
-            </p>
-            <span class="status-badge planned-badge">Planned</span>
-          </div>
-          <div class="status-card implemented">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-check-circle"></i></span>
-              <h4>Moderation Service</h4>
-            </div>
-            <p>Mock and OpenAI modes. Prompt caching, TF-IDF gating, unsafe request blocking.</p>
-            <span class="status-badge implemented-badge">Implemented</span>
-          </div>
-          <div class="status-card implemented">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-check-circle"></i></span>
-              <h4>Spark Training</h4>
-            </div>
-            <p>RandomForest training, risk rollups, model serialization. Historical exporter prototype.</p>
-            <span class="status-badge implemented-badge">Implemented</span>
-          </div>
-          <div class="status-card planned">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-circle"></i></span>
-              <h4>Full Orchestration</h4>
-            </div>
-            <p>Automated pipeline startup, coordinated service management, end-to-end test suite.</p>
-            <span class="status-badge planned-badge">Planned</span>
-          </div>
-          <div class="status-card planned">
-            <div class="status-head"><span class="status-icon"><i class="fa-solid fa-circle"></i></span>
-              <h4>Ad Injection Stage</h4>
-            </div>
-            <p>Placeholder consumer exists. Real ad-matching logic not implemented.</p>
-            <span class="status-badge planned-badge">Planned</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ====== CITATION ====== -->
-    <section id="citation" class="section">
-      <div class="container">
-        <span class="rm-eyebrow"><i class="fa-solid fa-quote-right"></i> Cite</span>
-        <h2 class="rm-section-title">Citation</h2>
+        <span class="rm-eyebrow"><i class="fa-solid fa-play"></i> Visualization</span>
+        <h2 class="rm-section-title">Interactive Pipeline View</h2>
         <p class="rm-section-sub">
-          If you use this project in your work, please cite it as follows:
+          Watch the full request lifecycle &mdash; from ingestion to ad injection &mdash; in an animated walkthrough.
         </p>
 
-        <div class="bibtex-box" id="bibtex-box">
-          <button class="bibtex-copy" id="bibtex-copy" aria-label="Copy BibTeX to clipboard">
-            <i class="fa-regular fa-clipboard"></i> Copy
-          </button>
-          <pre>@misc{ai_ad_request_safety_pipeline_2026,
-            title = {AI Ad Request Safety Pipeline},
-            author = {Massive Data Mining Project Team},
-            year = {2026},
-            note = {University of Ss. Cyril and Methodius,
-            Faculty of Computer Science and Engineering},
-            howpublished = {\url{https://github.com/IamMistake/ai-ad-request-safety-pipeline}}
-            }</pre>
+        <div class="pipeline-animation" id="pipeline-animation">
+          <div class="anim-stage" id="anim-stage">
+            <div class="anim-request" id="anim-request">
+              <div class="anim-req-icon"><i class="fa-solid fa-paper-plane"></i></div>
+              <div class="anim-req-label">Request</div>
+            </div>
+
+            <div class="anim-node anim-kafka" id="anim-node-kafka">
+              <div class="anim-node-icon"><i class="fa-solid fa-stream"></i></div>
+              <div class="anim-node-label">Kafka<br><small>requests.raw</small></div>
+            </div>
+
+            <div class="anim-node anim-flink" id="anim-node-flink">
+              <div class="anim-node-icon"><i class="fa-solid fa-shield-halved"></i></div>
+              <div class="anim-node-label">Flink<br><small>Fraud Detection</small></div>
+            </div>
+
+            <div class="anim-node anim-routing" id="anim-node-routing">
+              <div class="anim-node-icon"><i class="fa-solid fa-code-branch"></i></div>
+              <div class="anim-node-label">Routing</div>
+            </div>
+
+            <div class="anim-node anim-moderation" id="anim-node-moderation">
+              <div class="anim-node-icon"><i class="fa-solid fa-filter"></i></div>
+              <div class="anim-node-label">Moderation</div>
+            </div>
+
+            <div class="anim-node anim-ad" id="anim-node-ad">
+              <div class="anim-node-icon"><i class="fa-solid fa-bullhorn"></i></div>
+              <div class="anim-node-label">Ad Injection</div>
+            </div>
+
+            <div class="anim-node anim-spark" id="anim-node-spark">
+              <div class="anim-node-icon"><i class="fa-solid fa-brain"></i></div>
+              <div class="anim-node-label">Spark<br><small>ML Training</small></div>
+            </div>
+
+            <!-- Path lines -->
+            <svg class="anim-paths" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet">
+              <!-- Main flow line -->
+              <path class="anim-path-main" id="anim-path-main" d="M 30 250 L 130 250 L 130 130 L 270 130 L 270 250 L 410 250 L 410 370 L 550 370" fill="none" stroke-width="3" />
+              <!-- Routing branches -->
+              <path class="anim-path-branch" id="anim-path-branch-sus" d="M 270 250 L 270 370 L 550 370" fill="none" stroke-width="2" stroke-dasharray="6,4" />
+              <path class="anim-path-branch" id="anim-path-branch-clean" d="M 270 250 L 410 250" fill="none" stroke-width="2" stroke-dasharray="6,4" />
+              <path class="anim-path-branch" id="anim-path-branch-fraud" d="M 410 370 L 550 370" fill="none" stroke-width="2" stroke-dasharray="6,4" />
+              <!-- Spark offline -->
+              <path class="anim-path-offline" id="anim-path-offline" d="M 410 370 L 550 130 L 680 130 L 680 250" fill="none" stroke-width="2" stroke-dasharray="4,4" />
+            </svg>
+          </div>
+
+          <div class="anim-status" id="anim-status">
+            <span class="anim-status-dot"></span>
+            <span class="anim-status-text" id="anim-status-text">Ready</span>
+          </div>
+
+          <div class="anim-controls">
+            <button class="anim-btn" id="anim-play-btn" aria-label="Play animation">
+              <i class="fa-solid fa-play"></i> Play
+            </button>
+            <button class="anim-btn anim-btn-ghost" id="anim-reset-btn" aria-label="Reset">
+              <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -788,7 +834,8 @@
           </div>
         </div>
         <p class="footer-credit">
-          Massive Data Mining &middot; University Project &middot;
+          <a href="https://adstract.ai" target="_blank" rel="noopener"><strong>Adstract AI</strong></a>
+          &middot; Fraud &amp; Moderation Pipeline &middot; FINKI &middot;
           <a href="https://github.com/IamMistake/ai-ad-request-safety-pipeline" target="_blank" rel="noopener">
             <i class="fa-brands fa-github"></i> GitHub
           </a>

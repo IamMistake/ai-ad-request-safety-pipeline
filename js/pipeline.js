@@ -11,7 +11,7 @@
   var components = {
     simulator: {
       title: 'Request Simulator',
-      desc: 'Generates synthetic ad request traffic from the WildChat dataset (175k real GPT conversations). Each request is enriched with session context, user agent, IP geolocation (GeoLite2), and ASN. Supports normal and fraud traffic profiles for controlled experiments.',
+      desc: 'Streams real ad request traffic from the WildChat dataset (175k real GPT conversations) with fraud requests injected for controlled evaluation. Each request is enriched with session context, user agent, IP geolocation (GeoLite2), and ASN. Supports normal and fraud traffic profiles for controlled experiments.',
       file: 'kafka/producers/request_simulator.py'
     },
     kafka: {
@@ -21,9 +21,8 @@
     },
     flink: {
       title: 'Flink Fraud Detection',
-      desc: 'Real-time stream processor consuming <code>requests.raw</code>. Assigns event-time watermarks, then keys the stream through three detectors: UserDetector (IP burst) &rarr; SessionDetector (6 rules: burst, IP churn, country hop, ASN churn, prompt replay, regular cadence) &rarr; PublisherDetector (3 rules: burst, suspicious rate, bad UA rate). Plus 4 stateless rules. Routes by score threshold.',
-      file: 'flink_service/fraud_detection.py',
-      rules: '14 rules total'
+      desc: 'Real-time stream processor consuming <code>requests.raw</code>. Assigns event-time watermarks, then keys the stream through three detectors: UserDetector (IP burst) &rarr; SessionDetector (6 rules: burst, IP churn, country hop, ASN churn, prompt replay, regular cadence) &rarr; PublisherDetector (3 rules: burst, suspicious rate, bad UA rate). Plus 4 stateless rules for shallow checks. Routes by score threshold.',
+      file: 'flink_service/fraud_detection.py'
     },
     rfc: {
       title: 'RFC Scoring Service',

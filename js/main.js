@@ -1,7 +1,3 @@
-// ============================================================
-// Main JS — TOC toggle, active tracking, scroll fade-in
-// ============================================================
-
 (function () {
   'use strict';
 
@@ -35,7 +31,6 @@
 
         sections.forEach(function (item) {
           var rect = item.el.getBoundingClientRect();
-          // Find the section closest to the top of viewport (or just above it)
           if (rect.top <= 200 && rect.top < currentTop) {
             currentTop = rect.top;
             current = item;
@@ -63,9 +58,10 @@
   function observeFadeIn() {
     var elements = document.querySelectorAll(
       '.pillars, .flow-steps, .pipeline-container, .rules-explorer, ' +
-      '.results-grid, .status-grid, .quickstart-steps, .spark-grid, ' +
+      '.results-grid, .quickstart-steps, .spark-grid, ' +
       '.data-sources, .fraud-table-wrap, .abstract-box, .metrics-strip, ' +
-      '.flink-diagram, .spark-diagram'
+      '.flink-diagram, .spark-diagram, .moderation-diagram, .moderation-flow, ' +
+      '.moderation-tfidf'
     );
 
     elements.forEach(function (el) {
@@ -96,52 +92,142 @@
     });
   }
 
-  // Wait for SVG objects to load, then observe
-  function waitForSvgs(callback) {
-    var objects = document.querySelectorAll('object');
-    var remaining = objects.length;
-    if (remaining === 0) {
-      callback();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', observeFadeIn);
+  } else {
+    observeFadeIn();
+  }
+
+  // --- Other Works dropdown (global functions for onclick= attributes) ---
+  window.toggleMoreWorks = function () {
+    var dropdown = document.getElementById('moreWorksDropdown');
+    var button = document.querySelector('.more-works-btn');
+    if (!dropdown || !button) return;
+    dropdown.classList.toggle('show');
+    button.classList.toggle('active');
+  };
+
+  document.addEventListener('click', function (event) {
+    var container = document.querySelector('.more-works-container');
+    var dropdown = document.getElementById('moreWorksDropdown');
+    var button = document.querySelector('.more-works-btn');
+    if (container && !container.contains(event.target)) {
+      if (dropdown) dropdown.classList.remove('show');
+      if (button) button.classList.remove('active');
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      var dropdown = document.getElementById('moreWorksDropdown');
+      var button = document.querySelector('.more-works-btn');
+      if (dropdown) dropdown.classList.remove('show');
+      if (button) button.classList.remove('active');
+    }
+  });
+
+  // --- Interactive Pipeline Animation ---
+  var animState = {
+    running: false,
+    step: 0,
+    timer: null,
+    steps: [
+      { node: null, status: 'Request entering Kafka...', delay: 600 },
+      { node: 'kafka', status: 'Ingested into requests.raw topic', delay: 1000 },
+      { node: 'flink', status: 'Flink evaluating fraud rules...', delay: 1200 },
+      { node: 'routing', status: 'Routing suspicious requests to moderation', delay: 800 },
+      { node: 'moderation', status: 'Moderation checking prompt safety...', delay: 1200 },
+      { node: 'ad', status: 'Clean request approved for ad injection', delay: 1000 },
+      { node: null, status: 'Pipeline complete - request processed', delay: 500 }
+    ]
+  };
+
+  var animReq = document.getElementById('anim-request');
+  var animStatusText = document.getElementById('anim-status-text');
+  var animPlayBtn = document.getElementById('anim-play-btn');
+  var animResetBtn = document.getElementById('anim-reset-btn');
+
+  var animNodes = {
+    kafka: document.getElementById('anim-node-kafka'),
+    flink: document.getElementById('anim-node-flink'),
+    routing: document.getElementById('anim-node-routing'),
+    moderation: document.getElementById('anim-node-moderation'),
+    ad: document.getElementById('anim-node-ad'),
+    spark: document.getElementById('anim-node-spark')
+  };
+
+  function resetAnimation() {
+    if (animState.timer) {
+      clearTimeout(animState.timer);
+      animState.timer = null;
+    }
+    animState.running = false;
+    animState.step = 0;
+    if (animPlayBtn) {
+      animPlayBtn.disabled = false;
+      animPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i> Play';
+    }
+    if (animReq) {
+      animReq.className = 'anim-request';
+      animReq.style.opacity = '0';
+    }
+    if (animStatusText) animStatusText.textContent = 'Ready';
+    Object.keys(animNodes).forEach(function (key) {
+      if (animNodes[key]) animNodes[key].classList.remove('active');
+    });
+  }
+
+  function runAnimationStep() {
+    if (!animState.running) return;
+
+    var stepData = animState.steps[animState.step];
+    if (!stepData) {
+      if (animStatusText) animStatusText.textContent = 'All requests processed successfully';
+      if (animPlayBtn) {
+        animPlayBtn.disabled = false;
+        animPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i> Play';
+      }
+      animState.running = false;
       return;
     }
-    objects.forEach(function (obj) {
-      obj.addEventListener('load', function () {
-        remaining -= 1;
-        if (remaining === 0) callback();
-      });
-      if (obj.contentDocument || obj.type === 'failed') {
-        remaining -= 1;
-      }
-    });
-    setTimeout(callback, 1500);
+
+    if (animStatusText) animStatusText.textContent = stepData.status;
+
+    if (animReq && stepData.node) {
+      animReq.className = 'anim-request active at-' + stepData.node;
+      animReq.style.opacity = '1';
+    }
+
+    if (stepData.node && animNodes[stepData.node]) {
+      animNodes[stepData.node].classList.add('active');
+    }
+
+    animState.step++;
+    animState.timer = setTimeout(runAnimationStep, stepData.delay);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      waitForSvgs(observeFadeIn);
-    });
-  } else {
-    waitForSvgs(observeFadeIn);
+  function startAnimation() {
+    if (animState.running) return;
+    resetAnimation();
+    animState.running = true;
+    animState.step = 0;
+    if (animPlayBtn) {
+      animPlayBtn.disabled = true;
+      animPlayBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Playing';
+    }
+    if (animReq) {
+      animReq.className = 'anim-request';
+      animReq.style.opacity = '0';
+    }
+    runAnimationStep();
   }
 
-  // --- BibTeX copy button ---
-  var bibBtn = document.getElementById('bibtex-copy');
-  if (bibBtn) {
-    bibBtn.addEventListener('click', function () {
-      var pre = this.parentElement.querySelector('pre');
-      if (pre) {
-        var text = pre.textContent || '';
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text.trim()).then(function () {
-            bibBtn.innerHTML = '<i class="fa-regular fa-check-circle"></i> Copied!';
-            bibBtn.classList.add('copied');
-            setTimeout(function () {
-              bibBtn.innerHTML = '<i class="fa-regular fa-clipboard"></i> Copy';
-              bibBtn.classList.remove('copied');
-            }, 2000);
-          });
-        }
-      }
+  if (animPlayBtn) {
+    animPlayBtn.addEventListener('click', startAnimation);
+  }
+  if (animResetBtn) {
+    animResetBtn.addEventListener('click', function () {
+      resetAnimation();
     });
   }
 

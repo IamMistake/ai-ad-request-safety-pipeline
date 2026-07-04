@@ -6,6 +6,8 @@
 !assets/
 !assets/diagrams/*
 !assets/graphs/*
+!assets/images/
+!assets/images/*
 !.gitignore
 !.nojekyll
 !DESIGN.md
