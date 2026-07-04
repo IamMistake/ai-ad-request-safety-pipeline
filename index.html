@@ -767,65 +767,80 @@
 
         <div class="pipeline-animation" id="pipeline-animation">
           <div class="anim-stage" id="anim-stage">
-            <div class="anim-round-badge" id="anim-round-badge">Request <span id="anim-round-num">#1</span></div>
+            <div class="anim-round-badge" id="anim-round-badge">Clean Request</div>
 
-            <div class="anim-flow-row" id="anim-flow-row">
-              <div class="anim-unit" id="anim-unit-source">
-                <div class="anim-node-icon"><i class="fa-solid fa-database"></i></div>
-                <div class="anim-node-label">Real Data<br><small>fraud injected</small></div>
-                <div class="anim-step-label">Preparing request<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+            <div class="anim-branch-map" aria-label="Animated branching request pipeline">
+              <div class="anim-path path-user-raw" id="anim-link-user-raw"><span class="pulse-dot"></span></div>
+              <div class="anim-path path-raw-flink" id="anim-link-raw-flink"><span class="pulse-dot"></span></div>
+              <div class="anim-path path-flink-sus" id="anim-link-flink-sus"><span class="pulse-dot"></span><span class="path-word">suspicious</span></div>
+              <div class="anim-path path-flink-clean pass" id="anim-link-flink-clean"><span class="pulse-dot"></span><span class="path-word">clean</span></div>
+              <div class="anim-path path-flink-fraud fail" id="anim-link-flink-fraud"><span class="pulse-dot"></span><span class="path-word">fraud</span></div>
+              <div class="anim-path path-sus-rfc" id="anim-link-sus-rfc"><span class="pulse-dot"></span></div>
+              <div class="anim-path path-rfc-clean pass" id="anim-link-rfc-clean"><span class="pulse-dot"></span><span class="path-word pass">clean</span></div>
+              <div class="anim-path path-rfc-fraud fail" id="anim-link-rfc-fraud"><span class="pulse-dot"></span><span class="path-word fail">fraud</span></div>
+              <div class="anim-path path-clean-moderation" id="anim-link-clean-moderation"><span class="pulse-dot"></span></div>
+              <div class="anim-path path-moderation-ad pass" id="anim-link-moderation-ad"><span class="pulse-dot"></span><span class="path-word pass">safe</span></div>
+              <div class="anim-path path-fraud-db" id="anim-link-fraud-db"><span class="pulse-dot"></span></div>
+              <div class="anim-path path-ad-process" id="anim-link-ad-process"><span class="pulse-dot"></span></div>
+
+              <div class="anim-unit anim-user" id="anim-unit-user">
+                <div class="anim-node-icon"><i class="fa-solid fa-user"></i></div>
+                <div class="anim-node-label">User Request</div>
               </div>
-
-              <div class="anim-link" id="anim-link-source-kafka" aria-hidden="true"><span class="pulse-dot"></span></div>
-
-              <div class="anim-unit" id="anim-unit-kafka">
-                <div class="anim-node-icon"><i class="fa-solid fa-stream"></i></div>
-                <div class="anim-node-label">Kafka<br><small>requests.raw</small></div>
-                <div class="anim-step-label">Buffering event<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              <div class="anim-unit anim-raw" id="anim-unit-raw">
+                <div class="anim-node-kicker">Kafka topic</div>
+                <div class="anim-node-label">requests.raw</div>
               </div>
-
-              <div class="anim-link" id="anim-link-kafka-flink" aria-hidden="true"><span class="pulse-dot"></span></div>
-
-              <div class="anim-unit" id="anim-unit-flink">
+              <div class="anim-unit anim-flink" id="anim-unit-flink">
                 <div class="anim-node-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                <div class="anim-node-label">Flink<br><small>Fraud Detection</small></div>
-                <div class="anim-step-label">Scoring fraud signals<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+                <div class="anim-node-label">Flink<br><small>fraud rules</small></div>
               </div>
-
-              <div class="anim-link" id="anim-link-flink-rfc" aria-hidden="true"><span class="pulse-dot"></span></div>
-
-              <div class="anim-unit" id="anim-unit-rfc">
+              <div class="anim-unit anim-sus" id="anim-unit-sus">
+                <div class="anim-node-kicker">Kafka topic</div>
+                <div class="anim-node-label">requests.sus</div>
+              </div>
+              <div class="anim-unit anim-clean" id="anim-unit-clean">
+                <div class="anim-node-kicker">Kafka topic</div>
+                <div class="anim-node-label">requests.clean</div>
+              </div>
+              <div class="anim-unit anim-fraud" id="anim-unit-fraud">
+                <div class="anim-node-kicker">Kafka topic</div>
+                <div class="anim-node-label">requests.fraud</div>
+              </div>
+              <div class="anim-unit anim-rfc" id="anim-unit-rfc">
                 <div class="anim-node-icon"><i class="fa-solid fa-tree"></i></div>
-                <div class="anim-node-label">RFC<br><small>suspicious scoring</small></div>
-                <div class="anim-step-label">Resolving borderline risk<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+                <div class="anim-node-label">RFC Scoring<br><small>model decision</small></div>
               </div>
-
-              <div class="anim-link" id="anim-link-rfc-moderation" aria-hidden="true"><span class="pulse-dot"></span></div>
-
-              <div class="anim-unit" id="anim-unit-moderation">
+              <div class="anim-unit anim-moderation" id="anim-unit-moderation">
                 <div class="anim-node-icon"><i class="fa-solid fa-filter"></i></div>
                 <div class="anim-node-label">Moderation<br><small>prompt safety</small></div>
-                <div class="anim-step-label">Checking content<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
               </div>
-
-              <div class="anim-link" id="anim-link-moderation-ad" aria-hidden="true"><span class="pulse-dot"></span></div>
-
-              <div class="anim-unit" id="anim-unit-ad">
-                <div class="anim-node-icon"><i class="fa-solid fa-bullhorn"></i></div>
-                <div class="anim-node-label">Ad Injection<br><small>approved</small></div>
-                <div class="anim-step-label">Publishing decision<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              <div class="anim-unit anim-db" id="anim-unit-db">
+                <div class="anim-node-icon"><i class="fa-solid fa-ban"></i></div>
+                <div class="anim-node-label">Blocked<br><small>fraud store</small></div>
+              </div>
+              <div class="anim-unit anim-ad" id="anim-unit-ad">
+                <div class="anim-node-kicker">Kafka topic</div>
+                <div class="anim-node-label">ad.injection</div>
+              </div>
+              <div class="anim-unit anim-process" id="anim-unit-process">
+                <div class="anim-node-icon"><i class="fa-solid fa-magnifying-glass-dollar"></i></div>
+                <div class="anim-node-label">Finding Ad<br><small>process</small></div>
+              </div>
+              <div class="anim-support-card anim-spark" id="anim-unit-spark">
+                <i class="fa-solid fa-brain"></i>
+                <span>Offline Spark Analytics trains the RandomForest model used by RFC scoring.</span>
               </div>
             </div>
 
-            <div class="anim-support-row">
-              <div class="anim-support-card" id="anim-unit-spark">
-                <i class="fa-solid fa-brain"></i>
-                <span>Spark trains the RandomForest context used by suspicious-request scoring.</span>
-              </div>
-              <div class="anim-loop-chip" id="anim-loop-chip">
-                <i class="fa-solid fa-rotate"></i>
-                <span>Next request</span><span class="dots"><span>.</span><span>.</span><span>.</span></span>
-              </div>
+            <div class="anim-scenario-card" id="anim-scenario-card">
+              <strong id="anim-scenario-example">Example:</strong>
+              <span id="anim-scenario-result">Normal IP, normal session, safe prompt. Final result: approved for ad injection.</span>
+            </div>
+
+            <div class="anim-loop-chip" id="anim-loop-chip">
+              <i class="fa-solid fa-rotate"></i>
+              <span>Next request type</span><span class="dots"><span>.</span><span>.</span><span>.</span></span>
             </div>
 
             <div class="anim-output" id="anim-output" aria-live="polite">
