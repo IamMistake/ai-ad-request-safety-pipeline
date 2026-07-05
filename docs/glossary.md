@@ -30,9 +30,10 @@ A stream partitioned by a key, such as `user_ip`, allowing stateful per-entity p
 
 The moderation decision outcome that reflects prompt safety, abuse, or policy risk.
 
-## Request Simulator
+## Requests Sender
 
-The synthetic event generator used to produce normal and suspicious AI ad request traffic.
+The Kafka producer that replays generated labeled request datasets while publishing
+only raw request payloads.
 
 ## Spark
 

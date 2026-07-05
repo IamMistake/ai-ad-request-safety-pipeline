@@ -32,13 +32,13 @@ This repository implements the request-safety subsystem behind that principle. I
 - **Publisher-safe ad path** where only fraud-clean and moderation-clean requests reach `ad.injection`.
 - **Historical analytics** with Spark rollups for IP, publisher, ASN, and session risk signals.
 - **Offline ML training** with a Random Forest fraud model written to `spark_service/output/`.
-- **Realistic request simulation** using transformed WildChat prompts plus GeoLite-derived request context.
+- **Realistic request simulation** using WildChat prompt traffic, stable synthetic IPs, and offline fraud labels.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A[Request Simulator] --> B[Kafka requests.raw]
+    A[Requests Sender] --> B[Kafka requests.raw]
     B --> C[Flink Fraud Detection]
     C --> D[requests.clean]
     C --> E[requests.sus]
@@ -56,7 +56,7 @@ flowchart LR
 
 | Stage | What it does | Main file |
 | --- | --- | --- |
-| Request simulator | Builds request events from transformed WildChat prompt rows | `kafka/producers/request_simulator.py` |
+| Requests sender | Replays labeled request events to Kafka | `kafka/producers/requests_sender.py` |
 | Kafka infra | Runs local Kafka, Zookeeper, and Kafka UI | `docker-compose.yml` |
 | Flink fraud detection | Scores and routes requests as clean, suspicious, or fraud | `flink_service/fraud_detection.py` |
 | RFC scoring | Model-backed scoring for suspicious requests | `scoring_service/` |
@@ -112,11 +112,18 @@ Default moderation uses `MODERATION_PROVIDER=mock`. To call OpenAI Moderation, s
 
 ### Prepare simulator data
 
+Download WildChat locally, then build labeled replay splits:
+
 ```bash
-python scripts/transform_wildchat_user_prompts.py
+python scripts/download_wildchat.py
 ```
 
-The simulator reads transformed Arrow files from `datasets/WildChat/train/`.
+```bash
+python scripts/build_labeled_requests_dataset.py
+```
+
+The simulator replays `datasets/labeled_requests/train.jsonl` by default and
+publishes only each row's `event` payload to Kafka.
 
 ## Run Locally
 
@@ -149,7 +156,13 @@ python pipeline_consumers/ad_injection_consumer.py
 ### 5. Publish simulated requests
 
 ```bash
-python kafka/producers/request_simulator.py
+python kafka/producers/requests_sender.py
+```
+
+Replay a different split with:
+
+```bash
+python kafka/producers/requests_sender.py --input datasets/labeled_requests/test.jsonl
 ```
 
 > [!WARNING]

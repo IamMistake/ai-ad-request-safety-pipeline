@@ -7,7 +7,7 @@ deleted so new rules can be added one by one.
 ## Intended Pipeline
 
 ```text
-Request Simulator
+Requests Sender
 -> Kafka requests.raw
 -> Flink fraud starter
 -> requests.clean / requests.sus / requests.fraud
@@ -23,7 +23,7 @@ Request Simulator
 | Area | Status | Main files |
 | --- | --- | --- |
 | Local Kafka infrastructure | Implemented | `docker-compose.yml` |
-| Request simulator | Implemented prototype; publishes nested request events to `requests.raw` | `kafka/producers/request_simulator.py`, `kafka/producers/simulator_events.py` |
+| Requests sender | Implemented JSONL replay prototype; publishes only labeled-row `event` payloads to `requests.raw` | `kafka/producers/requests_sender.py`, `scripts/build_labeled_requests_dataset.py`, `scripts/fraud_injectors/` |
 | Shared topic constants | Implemented for active topics | `pipeline_consumers/constants.py` |
 | Debug consumer | Implemented for local topic inspection | `test_consumer.py` |
 | Flink starter | Implements IP burst, session-scoped scoring, publisher burst, stateless scoring rules, and score-based routing | `flink_service/fraud_detection.py`, `flink_service/user_detector.py`, `flink_service/session_detector.py`, `flink_service/publisher_detector.py`, `flink_service/rules.py`, `flink_service/events.py`, `flink_service/constants.py` |
@@ -33,6 +33,21 @@ Request Simulator
 | Spark training | Implemented offline prototype; reads historical JSONL and writes model outputs | `spark_service/spark_training.py` |
 | Historical exporter | Implemented prototype, but not aligned with the current event flow | `spark_service/historical_exporter.py` |
 | Smoke scripts | Present for manual flow checks | `scripts/test_full_pipeline.sh`, `scripts/test_fraud_block_flow.sh`, `scripts/test_moderation_block_flow.sh` |
+
+## Simulator Current Behavior
+
+The requests sender no longer opens transformed Arrow shards directly. The current
+dataset path is:
+
+1. Manually download WildChat into `datasets/WildChat/raw/` as `.parquet` or `.jsonl`.
+2. Run `python scripts/build_labeled_requests_dataset.py`.
+3. The builder writes `datasets/labeled_requests/train.jsonl`, `validation.jsonl`,
+   `test.jsonl`, and `dataset_summary.json`.
+4. Run `python kafka/producers/requests_sender.py` to replay `train.jsonl`, or
+   pass `--input` for another split.
+
+Labeled rows keep fraud metadata outside the raw Kafka payload. The requests sender
+publishes only `row["event"]` to `requests.raw`.
 
 ## Flink Current Behavior
 
@@ -105,7 +120,7 @@ The old Flink fraud internals were removed:
 | Clean event contract across all stages | Needed so Flink, RFC scoring, moderation, exporter, and Spark agree on payload shapes. |
 | Production-grade moderation failure handling | Needed for retries, dead-letter behavior, provider errors, and consistent blocked events. |
 | Real ad injection stage | Needed for the final approved-request path. |
-| Full orchestration | Needed to run Kafka, simulator, Flink, scoring, moderation, ad injection, exporter, and Spark together. |
+| Full orchestration | Needed to run Kafka, requests sender, Flink, scoring, moderation, ad injection, exporter, and Spark together. |
 | Automated tests | No configured test suite exists yet. Current validation is manual/script-based. |
 
 ## Next Flink Steps

@@ -184,6 +184,10 @@ Kafka messages are still JSON. Inside Python code, event payloads should be
 parsed into dataclasses from `shared/schemas.py`, then serialized back to JSON at
 Kafka boundaries.
 
+Offline labeled datasets wrap raw request events in training metadata, but those
+labels are not part of any Kafka topic. The requests sender publishes only the nested
+`event` object to `requests.raw`.
+
 | Class | Kafka shape |
 | --- | --- |
 | `RequestContext` | Nested `request_context` object |

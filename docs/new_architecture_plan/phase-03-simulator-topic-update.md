@@ -43,7 +43,7 @@ The request schema should stay nested.
 ## Likely Files
 
 ```text
-kafka/producers/request_simulator.py
+kafka/producers/requests_sender.py
 pipeline_consumers/constants.py
 ```
 
@@ -66,7 +66,7 @@ rename.
 ## Definition Of Done
 
 ```text
-simulator publishes nested request events to requests.raw
+requests sender publishes nested request events to requests.raw
 debug consumer can inspect those events
 docs show requests.raw as the active ingress topic
 ```

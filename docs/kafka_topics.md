@@ -4,7 +4,7 @@
 
 | Topic | Purpose | Current reference | Status |
 | --- | --- | --- | --- |
-| `requests.raw` | Raw ingress topic for simulator output and Flink fraud detection | `kafka/producers/request_simulator.py`, `test_consumer.py`, `flink_service/fraud_detection.py` | Active target |
+| `requests.raw` | Raw ingress topic for sender output and Flink fraud detection | `kafka/producers/requests_sender.py`, `test_consumer.py`, `flink_service/fraud_detection.py` | Active target |
 | `requests.sus` | Suspicious requests from Flink waiting for RFC model scoring | `flink_service/fraud_detection.py`, planned `scoring_service/` | Active target |
 | `requests.clean` | Fraud-clean requests ready for moderation | `flink_service/fraud_detection.py`, planned `scoring_service/`, `pipeline_consumers/moderation_consumer.py` | Active target |
 | `requests.fraud` | Blocked fraud or unsafe request events for logs and Spark | `flink_service/fraud_detection.py`, planned `scoring_service/`, `pipeline_consumers/moderation_consumer.py` | Active target |
@@ -30,7 +30,7 @@ flowchart LR
 
 ## Implementation Notes
 
-- The simulator publishes raw events to `requests.raw`.
+- The requests sender publishes raw events to `requests.raw`.
 - Flink consumes `requests.raw` and routes requests to `requests.clean`, `requests.sus`, or `requests.fraud`.
 - The RFC scoring service consumes `requests.sus` and routes requests to `requests.clean` or `requests.fraud`.
 - Moderation consumes `requests.clean` and routes requests to `ad.injection` or `requests.fraud`.

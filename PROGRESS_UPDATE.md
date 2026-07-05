@@ -2,7 +2,7 @@
 
 ## What we have so far
 
-- Pipeline is running as: Request Simulator -> Shallow Fraud Detection -> Kafka -> Flink -> Spark.
+- Pipeline is running as: Requests Sender -> Shallow Fraud Detection -> Kafka -> Flink -> Spark.
 - Flink fraud scoring now starts from `0.0` (independent from shallow score).
 - The new target architecture replaces separate verdict topics with `requests.clean`, `requests.sus`, and `requests.fraud`.
 - Simulator now generates session-based traffic with `normal` and `fraud` profiles.

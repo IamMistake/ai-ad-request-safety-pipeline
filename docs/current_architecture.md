@@ -10,7 +10,7 @@ batch path for deeper historical analysis.
 
 ```mermaid
 flowchart LR
-    A[Request Simulator] --> B[Kafka requests.raw]
+    A[Requests Sender] --> B[Kafka requests.raw]
     B --> C[Flink Fraud]
     C --> D[Kafka requests.sus]
     D --> E[RFC Scoring Service]
@@ -29,7 +29,7 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant Sim as Request Simulator
+    participant Sim as Requests Sender
     participant Kafka as Kafka Broker
     participant Flink as Flink Fraud Starter
     participant RFC as RFC Scoring Service
@@ -56,7 +56,7 @@ sequenceDiagram
 
 | Topic | Context |
 | --- | --- |
-| `requests.raw` | Raw ingress topic for simulator output |
+| `requests.raw` | Raw ingress topic for requests sender output |
 | `requests.sus` | Suspicious requests waiting for RFC scoring |
 | `requests.clean` | Fraud-clean requests waiting for moderation |
 | `requests.fraud` | Blocked fraud or unsafe requests |
@@ -66,7 +66,7 @@ sequenceDiagram
 
 | Layer | Why it exists |
 | --- | --- |
-| Request Simulator | Produces synthetic traffic for development, demos, and evaluation |
+| Requests Sender | Replays generated request traffic for development, demos, and evaluation |
 | Kafka | Decouples producers from processors and provides durable event streaming |
 | Flink | Performs low-latency fraud evaluation and request gating |
 | RFC Scoring Service | Uses the Spark-trained model to score suspicious requests |
@@ -77,7 +77,7 @@ sequenceDiagram
 
 | Component | Main responsibility | Current location |
 | --- | --- | --- |
-| Request Simulator | Build request events and publish them | `kafka/producers/request_simulator.py` |
+| Requests Sender | Replay labeled request events and publish raw payloads | `kafka/producers/requests_sender.py` |
 | Kafka Broker | Buffer, partition, and distribute events | `docker-compose.yml` |
 | Debug Consumer | Inspect messages during local development | `test_consumer.py` |
 | Flink Fraud Starter | Current clean-by-default stream gate; rules will be added one by one | `flink_service/fraud_detection.py` |

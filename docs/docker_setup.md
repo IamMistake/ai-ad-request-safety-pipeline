@@ -22,7 +22,7 @@ docker-compose up -d
 ## Useful Local Commands
 
 ```bash
-python kafka/producers/request_simulator.py
+python kafka/producers/requests_sender.py
 python test_consumer.py
 python flink_service/fraud_detection.py
 python pipeline_consumers/moderation_consumer.py

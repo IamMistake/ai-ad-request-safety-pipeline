@@ -34,7 +34,7 @@ The system follows a hybrid streaming plus batch architecture:
 
 ```mermaid
 flowchart LR
-    A[Request Simulator] --> B[Kafka requests.raw]
+    A[Requests Sender] --> B[Kafka requests.raw]
     B --> C[Flink Fraud]
     C --> D[Kafka requests.sus]
     D --> E[RFC Scoring Service]
@@ -55,7 +55,7 @@ flowchart LR
 | --- | --- |
 | `README.md` | Top-level quick start and repository summary |
 | `docker-compose.yml` | Local Kafka infrastructure |
-| `kafka/producers/request_simulator.py` | Prototype request generator |
+| `kafka/producers/requests_sender.py` | Labeled request dataset sender |
 | `flink_service/fraud_detection.py` | Current real-time fraud detection prototype |
 | `pipeline_consumers/moderation_consumer.py` | Moderation prototype with `.env` configuration |
 | `pipeline_consumers/ad_injection_consumer.py` | Placeholder ad-injection consumer |
@@ -70,7 +70,8 @@ flowchart LR
 | `docs/flink_processing.md` | Current Flink starter and future rule plan |
 | `docs/spark_analytics.md` | Spark placeholder until a new plan is written |
 | `docs/event_schemas.md` | Current JSON payloads across the pipeline |
-| `docs/request_simulator.md` | Synthetic traffic generation strategy |
+| `docs/requests_sender.md` | Labeled request replay strategy |
+| `docs/fraud_scripts.md` | How to append labeled fraud traffic |
 | `docs/moderation_service.md` | Moderation responsibilities and near-term plan |
 | `docs/implementation_status.md` | Current implementation state |
 | `docs/new_architecture_plan/` | Phased plan for the new topic and service architecture |
