@@ -1,97 +1,184 @@
 import argparse
 import json
-import pickle
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 
+import joblib
 import pandas as pd
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import avg, col, count, lit, lower, regexp_extract, sum as spark_sum, when
+from pyspark.sql.functions import col, length, lower, regexp_extract, size, when
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    precision_recall_fscore_support,
+)
 
 
 SCAM_REGEX = r"(hack|bitcoin|generator|credit card|loan|scam|earn money fast|click here)"
+UA_SIGNAL_REASONS = {"bad_user_agent", "publisher_bad_ua_rate"}
+BURST_SIGNAL_REASONS = {
+    "ip_burst",
+    "session_burst",
+    "publisher_burst",
+    "regular_cadence",
+}
+
+DEFAULT_INPUT = "spark_service/data/request_logs.json"
+DEFAULT_OUTPUT_DIR = "spark_service/output"
+DEFAULT_MIN_ROWS = 10
+DEFAULT_MODEL_THRESHOLD = 0.5
+
+FEATURE_COLUMNS = [
+    "flink_fraud_score",
+    "asn",
+    "prompt_length",
+    "contains_scam_keyword",
+    "flink_reason_count",
+    "has_user_agent_signal",
+    "has_burst_signal",
+]
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run Spark fraud analytics and local model training.")
-    parser.add_argument("--input", default="spark_service/data/request_logs.json", help="Input JSONL path")
-    parser.add_argument("--output-dir", default="spark_service/output", help="Output directory path")
-    parser.add_argument("--min-rows", type=int, default=10, help="Minimum labeled rows to train model")
+    parser = argparse.ArgumentParser(
+        description="Train RFC fraud model from Flink-enriched exported training rows."
+    )
+    parser.add_argument(
+        "--input",
+        default=DEFAULT_INPUT,
+        help="Input JSONL path produced by the historical exporter.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=DEFAULT_OUTPUT_DIR,
+        help="Output directory for model artifacts.",
+    )
+    parser.add_argument(
+        "--min-rows",
+        type=int,
+        default=DEFAULT_MIN_ROWS,
+        help="Minimum labeled rows to train model.",
+    )
     return parser
 
 
-def _schema_has_path(schema, path_parts: list[str]) -> bool:
-    if not path_parts:
-        return True
+def build_feature_dataframe(spark: SparkSession, input_path: str):
+    raw_df = spark.read.json(input_path)
+    if raw_df.rdd.isEmpty():
+        raise RuntimeError(f"Input dataset is empty: {input_path}")
 
-    field_name = path_parts[0]
-    field = next((candidate for candidate in schema.fields if candidate.name == field_name), None)
-    if field is None:
-        return False
+    fe = col("feature_event")
+    fraud = fe.getItem("fraud")
+    optional = fe.getItem("optional_context")
 
-    if len(path_parts) == 1:
-        return True
-
-    nested_schema = getattr(field.dataType, "fields", None)
-    if nested_schema is None:
-        return False
-
-    return _schema_has_path(field.dataType, path_parts[1:])
-
-
-def _select_path_or_null(raw_df, path: str, alias_name: str):
-    path_parts = path.split(".")
-    if _schema_has_path(raw_df.schema, path_parts):
-        return col(path).alias(alias_name)
-    return lit(None).alias(alias_name)
-
-
-def build_feature_dataframe(raw_df):
     df = raw_df.select(
-        col("req_id").alias("req_id"),
-        col("request.prompt").alias("prompt"),
-        col("request.publisher_id").alias("publisher_id"),
-        col("request.request_context.user_ip").alias("user_ip"),
-        col("request.request_context.session_id").alias("session_id"),
-        _select_path_or_null(raw_df, "request.optional_context.asn", "asn").cast("double"),
-        col("request.optional_context.country").alias("country"),
-        col("fraud_request_verdict.ip_hash").alias("ip_hash_from_fraud"),
-        col("fraud_request_verdict.fraud_score").cast("double").alias("fraud_score_feature"),
-        col("fraud_verdict").alias("fraud_verdict"),
-        col("moderation_label").alias("moderation_label"),
-        col("final_label").alias("final_label"),
+        fraud.getItem("score").cast("double").alias("flink_fraud_score"),
+        optional.getItem("asn").cast("double").alias("asn"),
+        length(fe.getItem("prompt")).alias("prompt_length"),
+        regexp_extract(lower(fe.getItem("prompt")), SCAM_REGEX, 0).alias("scam_match"),
+        fraud.getItem("reasons").alias("reasons"),
+        col("flink_topic"),
+        col("is_fraud").cast("int").alias("is_fraud"),
     )
 
-    df = df.withColumn("ip_hash", col("ip_hash_from_fraud"))
-    df = df.withColumn("prompt_lower", lower(col("prompt")))
-    df = df.withColumn("contains_scam", when(regexp_extract(col("prompt_lower"), SCAM_REGEX, 0) != "", 1).otherwise(0))
-    df = df.withColumn("is_fraud", when(col("final_label") == "fraud", 1).otherwise(0))
-    return df
+    df = df.withColumn(
+        "contains_scam_keyword",
+        when(col("scam_match") != "", 1).otherwise(0),
+    )
+    df = df.withColumn(
+        "flink_reason_count",
+        when(col("reasons").isNull(), 0).otherwise(size(col("reasons"))),
+    )
+    df = df.withColumn(
+        "has_user_agent_signal",
+        when(_reasons_contains_any(col("reasons"), UA_SIGNAL_REASONS), 1).otherwise(0),
+    )
+    df = df.withColumn(
+        "has_burst_signal",
+        when(_reasons_contains_any(col("reasons"), BURST_SIGNAL_REASONS), 1).otherwise(0),
+    )
+
+    return df.select(
+        "flink_topic",
+        "flink_fraud_score",
+        "asn",
+        "prompt_length",
+        "contains_scam_keyword",
+        "flink_reason_count",
+        "has_user_agent_signal",
+        "has_burst_signal",
+        "is_fraud",
+    )
 
 
-def write_risk_rollups(df, output_dir: Path) -> None:
-    (df.groupBy("user_ip").agg(count("*").alias("requests_from_ip"), avg("is_fraud").alias("fraud_rate"), avg("fraud_score_feature").alias("avg_fraud_score_feature")).write.mode("overwrite").json(str(output_dir / "ip_risk_scores.json")))
+def _reasons_contains_any(reasons_col, candidates):
+    from pyspark.sql.functions import array_contains
 
-    (df.groupBy("publisher_id").agg(count("*").alias("requests_from_publisher"), avg("is_fraud").alias("fraud_rate"), avg("fraud_score_feature").alias("avg_fraud_score_feature")).write.mode("overwrite").json(str(output_dir / "publisher_risk_scores.json")))
+    expr = None
+    for reason in candidates:
+        clause = array_contains(reasons_col, reason)
+        expr = clause if expr is None else expr | clause
+    return expr
 
-    (df.groupBy("asn").agg(count("*").alias("requests_from_asn"), avg("is_fraud").alias("fraud_rate")).write.mode("overwrite").json(str(output_dir / "asn_risk_scores.json")))
 
-    (df.groupBy("session_id").agg(count("*").alias("requests_per_session"), spark_sum("is_fraud").alias("fraud_requests_per_session")).write.mode("overwrite").json(str(output_dir / "session_risk_scores.json")))
+def collect_training_pandas(df) -> pd.DataFrame:
+    pandas_df = df.select(*FEATURE_COLUMNS, "is_fraud", "flink_topic").toPandas()
+    if pandas_df.empty:
+        return pandas_df
+
+    for numeric_col in ["flink_fraud_score", "asn", "prompt_length", "flink_reason_count"]:
+        pandas_df[numeric_col] = pd.to_numeric(pandas_df[numeric_col], errors="coerce")
+
+    pandas_df["flink_fraud_score"] = pandas_df["flink_fraud_score"].fillna(0.0)
+    pandas_df["asn"] = pandas_df["asn"].fillna(0.0)
+    pandas_df["prompt_length"] = pandas_df["prompt_length"].fillna(0)
+    pandas_df["flink_reason_count"] = pandas_df["flink_reason_count"].fillna(0)
+    pandas_df["contains_scam_keyword"] = pandas_df["contains_scam_keyword"].fillna(0).astype(int)
+    pandas_df["has_user_agent_signal"] = pandas_df["has_user_agent_signal"].fillna(0).astype(int)
+    pandas_df["has_burst_signal"] = pandas_df["has_burst_signal"].fillna(0).astype(int)
+    pandas_df["is_fraud"] = pandas_df["is_fraud"].astype(int)
+
+    return pandas_df
 
 
-def train_model(df, output_dir: Path, min_rows: int) -> None:
-    pandas_df = df.select("contains_scam", "asn", "fraud_score_feature", "is_fraud").toPandas()
+def write_training_features(pandas_df: pd.DataFrame, output_dir: Path) -> None:
+    features_dir = output_dir / "training_features"
+    pdf = pandas_df[FEATURE_COLUMNS + ["is_fraud", "flink_topic"]]
+    Path(features_dir).mkdir(parents=True, exist_ok=True)
+    # Write as a single JSON lines file for portability.
+    out_file = features_dir / "part-00000.json"
+    with out_file.open("w", encoding="utf-8") as handle:
+        for _, row in pdf.iterrows():
+            payload = row.to_dict()
+            payload = {k: (int(v) if isinstance(v, bool) else v) for k, v in payload.items()}
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    print(f"Training features written: {out_file}")
+
+
+def metrics_by_topic(pandas_df: pd.DataFrame, y_true, y_pred) -> dict:
+    by_topic: dict[str, dict] = {}
+    for topic in sorted(pandas_df["flink_topic"].dropna().unique().tolist()):
+        mask = pandas_df["flink_topic"] == topic
+        if mask.sum() == 0:
+            continue
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            y_true[mask], y_pred[mask], average="binary", zero_division=0
+        )
+        by_topic[topic] = {
+            "rows": int(mask.sum()),
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1": float(f1),
+        }
+    return by_topic
+
+
+def train_model(pandas_df: pd.DataFrame, output_dir: Path, min_rows: int) -> None:
     if pandas_df.empty:
         print("No rows available for ML training.")
         return
-
-    pandas_df["asn"] = pd.to_numeric(pandas_df["asn"], errors="coerce")
-    pandas_df["fraud_score_feature"] = pd.to_numeric(pandas_df["fraud_score_feature"], errors="coerce")
-    pandas_df["asn"] = pandas_df["asn"].fillna(0.0)
-    pandas_df["fraud_score_feature"] = pandas_df["fraud_score_feature"].fillna(0.0)
-    pandas_df = pandas_df.dropna(subset=["contains_scam", "is_fraud"])
 
     if len(pandas_df) < min_rows:
         print(f"Not enough rows to train model: {len(pandas_df)} < {min_rows}")
@@ -103,39 +190,69 @@ def train_model(df, output_dir: Path, min_rows: int) -> None:
         print("Model training skipped: dataset has only one class.")
         return
 
-    X = pandas_df[["contains_scam", "asn", "fraud_score_feature"]]
+    X = pandas_df[FEATURE_COLUMNS]
     class_counts = y.value_counts()
     can_stratify = len(class_counts) >= 2 and int(class_counts.min()) >= 2
     split_kwargs = {"test_size": 0.2, "random_state": 42}
     if can_stratify:
         split_kwargs["stratify"] = y
+    from sklearn.model_selection import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X, y, **split_kwargs)
 
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight="balanced")
     model.fit(X_train, y_train)
 
     predictions = model.predict(X_test)
     accuracy = float(accuracy_score(y_test, predictions))
     report = classification_report(y_test, predictions, output_dict=True, zero_division=0)
 
-    model_path = output_dir / "fraud_model.pkl"
-    with model_path.open("wb") as f:
-        pickle.dump(model, f)
+    by_topic = metrics_by_topic(
+        pandas_df.loc[X_test.index], y_test.values, predictions
+    )
+
+    model_path = output_dir / "fraud_model.joblib"
+    joblib.dump(model, model_path)
 
     metrics = {
         "rows_used": int(len(pandas_df)),
-        "feature_columns": ["contains_scam", "asn", "fraud_score_feature"],
+        "feature_columns": FEATURE_COLUMNS,
         "label_column": "is_fraud",
         "accuracy": accuracy,
         "classification_report": report,
+        "metrics_by_flink_topic": by_topic,
     }
-    (output_dir / "model_metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    (output_dir / "model_metrics.json").write_text(
+        json.dumps(metrics, indent=2), encoding="utf-8"
+    )
     (output_dir / "feature_columns.json").write_text(
-        json.dumps(metrics["feature_columns"], indent=2), encoding="utf-8"
+        json.dumps(FEATURE_COLUMNS, indent=2), encoding="utf-8"
+    )
+
+    model_version = "rfc-local-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    metadata = {
+        "model_version": model_version,
+        "model_type": "RandomForestClassifier",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "feature_columns": FEATURE_COLUMNS,
+        "threshold_default": DEFAULT_MODEL_THRESHOLD,
+        "training_rows": int(len(pandas_df)),
+        "label_policy": (
+            "Labels from offline labeled dataset joined by req_id; "
+            "is_fraud=1 rows are positives; is_fraud=0 rows are negatives; "
+            "training covers requests.clean, requests.sus, and requests.fraud Flink outputs."
+        ),
+    }
+    (output_dir / "model_metadata.json").write_text(
+        json.dumps(metadata, indent=2), encoding="utf-8"
     )
 
     print(f"Model saved: {model_path}")
     print(f"Accuracy: {accuracy:.4f}")
+    print(f"Class counts: {dict(class_counts)}")
+    if by_topic:
+        print("Metrics by flink_topic:")
+        for topic, m in by_topic.items():
+            print(f"  {topic}: rows={m['rows']} f1={m['f1']:.4f}")
 
 
 def main() -> None:
@@ -148,19 +265,16 @@ def main() -> None:
         print(f"No input logs found at {input_path}. Run historical exporter first.")
         return
 
-    spark = SparkSession.builder.appName("Adstract Spark Fraud Intelligence").master("local[*]").getOrCreate()
+    spark = SparkSession.builder.appName("Adstract Spark RFC Training").master("local[*]").getOrCreate()
     print("Spark session started.")
 
     try:
-        raw_df = spark.read.json(str(input_path))
-        if raw_df.rdd.isEmpty():
-            print("Input dataset is empty after Spark read. Nothing to process.")
-            return
+        feature_df = build_feature_dataframe(spark, str(input_path))
+        pandas_df = collect_training_pandas(feature_df)
+        print(f"Collected {len(pandas_df)} training rows.")
 
-        feature_df = build_feature_dataframe(raw_df)
-        write_risk_rollups(feature_df, output_dir)
-        print(f"Risk rollups written under {output_dir}")
-        train_model(feature_df, output_dir, args.min_rows)
+        write_training_features(pandas_df, output_dir)
+        train_model(pandas_df, output_dir, args.min_rows)
         print("Spark training pipeline finished.")
     finally:
         spark.stop()

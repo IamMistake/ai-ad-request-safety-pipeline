@@ -28,7 +28,7 @@ requests.sus
 Required files:
 
 ```text
-spark_service/output/fraud_model.pkl
+spark_service/output/fraud_model.joblib
 spark_service/output/feature_columns.json
 spark_service/output/model_metadata.json
 ```

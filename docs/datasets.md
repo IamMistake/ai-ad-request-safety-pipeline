@@ -70,8 +70,12 @@ The downloader writes `download_manifest.json` next to the downloaded files.
 ## Current Dataset Direction
 
 The repository uses `request_logs.json` as the canonical batch input point for
-Spark. The requests sender now replays generated labeled JSONL splits. Both
-paths should be maintained:
+Spark training. `spark_service/historical_exporter.py` consumes Flink output
+topics (`requests.clean`, `requests.sus`, `requests.fraud`), joins offline
+labels from `datasets/labeled_requests/*.jsonl` by `req_id`, and writes
+`request_logs.json` with the full Flink-enriched `feature_event` schema.
+
+Both paths should be maintained:
 
 - exported stream history
 - synthetic traffic captures

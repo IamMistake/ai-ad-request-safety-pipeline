@@ -30,8 +30,8 @@ Requests Sender
 | Shared event schemas | Implemented dataclass event models plus older dict helpers | `shared/schemas.py`, `shared/events.py` |
 | Moderation consumer | Implemented prototype with mock mode and optional OpenAI mode | `pipeline_consumers/moderation_consumer.py`, `pipeline_consumers/moderation_rules.py` |
 | Ad injection consumer | Placeholder only; consumes approved events and simulates work | `pipeline_consumers/ad_injection_consumer.py` |
-| Spark training | Implemented offline prototype; reads historical JSONL and writes model outputs | `spark_service/spark_training.py` |
-| Historical exporter | Implemented prototype, but not aligned with the current event flow | `spark_service/historical_exporter.py` |
+| Spark training | Implemented offline prototype; reads Flink-enriched exported rows, extracts numeric features, trains `RandomForestClassifier`, and writes RFC model artifacts | `spark_service/spark_training.py` |
+| Historical exporter | Implemented prototype; consumes Flink output topics, joins offline labels by `req_id`, preserves full `feature_event` schema | `spark_service/historical_exporter.py` |
 | Smoke scripts | Present for manual flow checks | `scripts/test_full_pipeline.sh`, `scripts/test_fraud_block_flow.sh`, `scripts/test_moderation_block_flow.sh` |
 
 ## Simulator Current Behavior
@@ -116,7 +116,7 @@ The old Flink fraud internals were removed:
 | --- | --- |
 | More Flink fraud rules | Current rules are still intentionally small. Add rules one by one. |
 | RFC scoring service | Needed to consume `requests.sus`, load the Spark-trained model, and route suspicious requests to `requests.clean` or `requests.fraud`. |
-| Online model artifact contract | Needed so Spark output can be safely loaded by the RFC scoring service. |
+| Online model artifact contract | RFC scoring service can load `spark_service/output/fraud_model.joblib`, `feature_columns.json`, and `model_metadata.json` produced by Spark. |
 | Clean event contract across all stages | Needed so Flink, RFC scoring, moderation, exporter, and Spark agree on payload shapes. |
 | Production-grade moderation failure handling | Needed for retries, dead-letter behavior, provider errors, and consistent blocked events. |
 | Real ad injection stage | Needed for the final approved-request path. |
