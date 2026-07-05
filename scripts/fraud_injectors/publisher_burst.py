@@ -7,18 +7,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
-class SessionFarmInjector:
-    """Many fake sessions, each with 1-3 requests, all from one publisher.
+class PublisherBurstInjector:
+    """Many requests from one publisher in a very short window.
 
-    Looks like real distributed users but it's one publisher generating
-    fake sessions. Each session stays within one IP and country so it
-    doesn't trigger IP churn or country hop. Low volume per session
-    avoids session burst. But the publisher-level volume may trigger
-    publisher burst if enough requests accumulate.
+    200 requests packed into 60 seconds across 4 parallel sessions.
+    Each session sends 50 requests at ~1.2s intervals, triggering
+    the per-publisher burst rate detector.
     """
 
-    attack_type = "session_farm"
-    _attack_id = "session_farm_001"
+    attack_type = "publisher_burst"
+    _attack_id = "publisher_burst_001"
 
     def generate(
         self,
@@ -42,22 +40,23 @@ class SessionFarmInjector:
         source_country = source_event.get("optional_context", {}).get("country", "US")
         source_language = source_event.get("language", "unknown")
         source_ua = source_event["request_context"]["user_agent"]
-        base_time = datetime.now(timezone.utc)
+        burst_start = datetime.now(timezone.utc)
 
         rows = []
-        session_count = 500
-        requests_per_session = 4
+        session_count = 16
+        requests_per_session = 100
+        session_interval = 1.2
 
         for session_index in range(session_count):
-            session_id = f"farm_session_{self._attack_id}_{session_index:04d}"
+            session_id = f"burst_session_{self._attack_id}_{session_index:04d}"
             session_ip = _stable_ip(session_id, source_country)
             session_asn = _stable_asn(session_id, source_country)
-            session_start = base_time + timedelta(seconds=session_index * rnd.randint(10, 30))
 
             for req_index in range(requests_per_session):
+                offset = session_index * 2 + req_index * session_interval
                 event = copy.deepcopy(source_event)
-                event["event_time"] = (session_start + timedelta(seconds=req_index * rnd.randint(3, 8))).isoformat()
-                event["req_id"] = f"session_farm_{session_index:04d}_{req_index}"
+                event["event_time"] = (burst_start + timedelta(seconds=offset)).isoformat()
+                event["req_id"] = f"publisher_burst_{session_index:02d}_{req_index:04d}"
                 event["prompt"] = source_prompt
                 event["language"] = source_language
                 event["publisher_id"] = publisher_id

@@ -56,7 +56,7 @@ class GeoMismatchInjector:
         base_time = datetime.now(timezone.utc)
 
         rows = []
-        row_count = 120
+        row_count = 1000
 
         for index in range(row_count):
             language, country = rnd.choice(LANGUAGE_COUNTRY_MISMATCHES)

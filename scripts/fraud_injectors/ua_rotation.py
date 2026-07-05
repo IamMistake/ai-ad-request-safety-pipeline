@@ -53,7 +53,7 @@ class UaRotationInjector:
         base_time = datetime.now(timezone.utc)
 
         rows = []
-        row_count = 150
+        row_count = 1200
 
         for index in range(row_count):
             session_id = f"ua_rotate_session_{self._attack_id}_{index:04d}"

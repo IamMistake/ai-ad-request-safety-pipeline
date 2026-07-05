@@ -7,18 +7,17 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
-class SessionFarmInjector:
-    """Many fake sessions, each with 1-3 requests, all from one publisher.
+class SlowDistributedAbuseInjector:
+    """Low-rate attack spread across many sessions to bypass burst rules.
 
-    Looks like real distributed users but it's one publisher generating
-    fake sessions. Each session stays within one IP and country so it
-    doesn't trigger IP churn or country hop. Low volume per session
-    avoids session burst. But the publisher-level volume may trigger
-    publisher burst if enough requests accumulate.
+    150 sessions, 1-2 requests each, spread over 6+ hours.
+    Same publisher. Each session looks innocent in isolation —
+    low volume, plausible timing — but the publisher-level total
+    accumulates to a high volume over the day.
     """
 
-    attack_type = "session_farm"
-    _attack_id = "session_farm_001"
+    attack_type = "slow_distributed_abuse"
+    _attack_id = "slow_distributed_abuse_001"
 
     def generate(
         self,
@@ -45,19 +44,21 @@ class SessionFarmInjector:
         base_time = datetime.now(timezone.utc)
 
         rows = []
-        session_count = 500
-        requests_per_session = 4
+        session_count = 1200
 
         for session_index in range(session_count):
-            session_id = f"farm_session_{self._attack_id}_{session_index:04d}"
+            session_id = f"slow_dist_session_{self._attack_id}_{session_index:04d}"
             session_ip = _stable_ip(session_id, source_country)
             session_asn = _stable_asn(session_id, source_country)
-            session_start = base_time + timedelta(seconds=session_index * rnd.randint(10, 30))
+            requests_in_session = rnd.randint(1, 2)
+            session_start = base_time + timedelta(minutes=rnd.randint(0, 360))
 
-            for req_index in range(requests_per_session):
+            for req_index in range(requests_in_session):
                 event = copy.deepcopy(source_event)
-                event["event_time"] = (session_start + timedelta(seconds=req_index * rnd.randint(3, 8))).isoformat()
-                event["req_id"] = f"session_farm_{session_index:04d}_{req_index}"
+                event["event_time"] = (
+                    session_start + timedelta(seconds=req_index * rnd.randint(5, 15))
+                ).isoformat()
+                event["req_id"] = f"slow_dist_{session_index:04d}_{req_index}"
                 event["prompt"] = source_prompt
                 event["language"] = source_language
                 event["publisher_id"] = publisher_id

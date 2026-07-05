@@ -36,7 +36,7 @@ class SlowPrompReplayInjector:
         base_time = datetime.now(timezone.utc)
 
         rows = []
-        row_count = 200
+        row_count = 1600
 
         for index in range(row_count):
             session_id = f"replay_fake_session_{self._attack_id}_{index:04d}"

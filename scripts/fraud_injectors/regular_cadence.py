@@ -45,7 +45,7 @@ class RegularCadenceInjector:
         interval_seconds = 2.0
 
         rows = []
-        row_count = 100
+        row_count = 800
 
         for index in range(row_count):
             session_id = f"cadence_session_{self._attack_id}_{index:04d}"

@@ -18,8 +18,10 @@ class FraudInjector(Protocol):
 
 def load_injectors() -> list[FraudInjector]:
     from scripts.fraud_injectors.geo_mismatch import GeoMismatchInjector
+    from scripts.fraud_injectors.publisher_burst import PublisherBurstInjector
     from scripts.fraud_injectors.regular_cadence import RegularCadenceInjector
     from scripts.fraud_injectors.session_farm import SessionFarmInjector
+    from scripts.fraud_injectors.slow_distributed_abuse import SlowDistributedAbuseInjector
     from scripts.fraud_injectors.slow_promp_replay import SlowPrompReplayInjector
     from scripts.fraud_injectors.ua_rotation import UaRotationInjector
 
@@ -29,4 +31,6 @@ def load_injectors() -> list[FraudInjector]:
         UaRotationInjector(),
         GeoMismatchInjector(),
         RegularCadenceInjector(),
+        PublisherBurstInjector(),
+        SlowDistributedAbuseInjector(),
     ]
