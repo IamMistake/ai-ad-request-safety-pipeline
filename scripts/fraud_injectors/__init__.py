@@ -17,5 +17,16 @@ class FraudInjector(Protocol):
 
 
 def load_injectors() -> list[FraudInjector]:
-    """First version keeps attack scripts optional and explicit."""
-    return []
+    from scripts.fraud_injectors.geo_mismatch import GeoMismatchInjector
+    from scripts.fraud_injectors.regular_cadence import RegularCadenceInjector
+    from scripts.fraud_injectors.session_farm import SessionFarmInjector
+    from scripts.fraud_injectors.slow_promp_replay import SlowPrompReplayInjector
+    from scripts.fraud_injectors.ua_rotation import UaRotationInjector
+
+    return [
+        SlowPrompReplayInjector(),
+        SessionFarmInjector(),
+        UaRotationInjector(),
+        GeoMismatchInjector(),
+        RegularCadenceInjector(),
+    ]
