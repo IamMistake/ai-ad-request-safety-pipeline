@@ -28,11 +28,13 @@ Requests Sender
 | Debug consumer | Implemented for local topic inspection | `test_consumer.py` |
 | Flink starter | Implements IP burst, session-scoped scoring, publisher burst, stateless scoring rules, and score-based routing | `flink_service/fraud_detection.py`, `flink_service/user_detector.py`, `flink_service/session_detector.py`, `flink_service/publisher_detector.py`, `flink_service/rules.py`, `flink_service/events.py`, `flink_service/constants.py` |
 | Shared event schemas | Implemented dataclass event models plus older dict helpers | `shared/schemas.py`, `shared/events.py` |
+| Shared RFC features | Implemented feature contract with online extractor shared by Spark training and RFC scoring | `shared/rfc_features.py` |
+| RFC scoring service | Implemented Kafka-only model-based scorer; consumes `requests.sus`, loads Spark artifacts, routes to `requests.clean` or `requests.fraud` | `scoring_service/rfc_scoring_service.py` |
 | Moderation consumer | Implemented prototype with mock mode and optional OpenAI mode | `pipeline_consumers/moderation_consumer.py`, `pipeline_consumers/moderation_rules.py` |
 | Ad injection consumer | Placeholder only; consumes approved events and simulates work | `pipeline_consumers/ad_injection_consumer.py` |
 | Spark training | Implemented offline prototype; reads Flink-enriched exported rows, extracts numeric features, trains `RandomForestClassifier`, and writes RFC model artifacts | `spark_service/spark_training.py` |
 | Historical exporter | Implemented prototype; consumes Flink output topics, joins offline labels by `req_id`, preserves full `feature_event` schema | `spark_service/historical_exporter.py` |
-| Smoke scripts | Present for manual flow checks | `scripts/test_full_pipeline.sh`, `scripts/test_fraud_block_flow.sh`, `scripts/test_moderation_block_flow.sh` |
+| Smoke scripts | Present for manual flow checks and RFC scoring unit checks | `scripts/test_full_pipeline.sh`, `scripts/test_fraud_block_flow.sh`, `scripts/test_moderation_block_flow.sh`, `scripts/smoke_rfc_scoring.py` |
 
 ## Simulator Current Behavior
 
@@ -115,8 +117,6 @@ The old Flink fraud internals were removed:
 | Missing piece | Why it matters |
 | --- | --- |
 | More Flink fraud rules | Current rules are still intentionally small. Add rules one by one. |
-| RFC scoring service | Needed to consume `requests.sus`, load the Spark-trained model, and route suspicious requests to `requests.clean` or `requests.fraud`. |
-| Online model artifact contract | RFC scoring service can load `spark_service/output/fraud_model.joblib`, `feature_columns.json`, and `model_metadata.json` produced by Spark. |
 | Clean event contract across all stages | Needed so Flink, RFC scoring, moderation, exporter, and Spark agree on payload shapes. |
 | Production-grade moderation failure handling | Needed for retries, dead-letter behavior, provider errors, and consistent blocked events. |
 | Real ad injection stage | Needed for the final approved-request path. |

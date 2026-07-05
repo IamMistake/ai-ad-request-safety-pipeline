@@ -1,5 +1,17 @@
 # Phase 6: RFC Scoring Service
 
+## Status
+
+**Implemented** in `scoring_service/rfc_scoring_service.py`.
+
+Implementation details:
+
+- Shared feature contract lives in `shared/rfc_features.py` (constants + online extractor).
+- `spark_service/spark_training.py` imports feature constants from the shared module.
+- `shared/events.py:add_rfc_context()` now accepts and includes `threshold`.
+- Manual offset commit after successful producer flush.
+- Smoke tests: `python scripts/smoke_rfc_scoring.py`.
+
 ## Goal
 
 Implement the missing model-based scoring branch for suspicious requests.
@@ -88,6 +100,15 @@ clear model loading errors
 produce output before committing offsets if manual commits are later added
 model_version included in each decision
 structured logs where practical
+```
+
+## Manual Run
+
+Model artifacts must be generated first by the Phase 05 Spark flow:
+
+```bash
+python spark_service/spark_training.py --input spark_service/data/request_logs.json
+python scoring_service/rfc_scoring_service.py --threshold 0.5
 ```
 
 ## Definition Of Done

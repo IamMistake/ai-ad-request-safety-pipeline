@@ -30,6 +30,7 @@ def add_rfc_context(
     score: float,
     model_version: str,
     reasons,
+    threshold: float,
 ) -> dict:
     enriched = deepcopy(event)
     enriched["rfc"] = {
@@ -37,6 +38,7 @@ def add_rfc_context(
         "verdict": verdict,
         "score": score,
         "model_version": model_version,
+        "threshold": threshold,
         "reasons": _copy_reasons(reasons),
     }
     return enriched

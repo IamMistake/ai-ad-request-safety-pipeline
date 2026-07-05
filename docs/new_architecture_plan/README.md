@@ -127,7 +127,7 @@ moderation blocks        -> verdict = unsafe
 3. [Phase 3: Simulator Topic Update](phase-03-simulator-topic-update.md)
 4. [Phase 4: Flink Routing And Rule Cleanup](phase-04-flink-routing-rule-cleanup.md)
 5. [Phase 5: Spark Exporter And Training Update](phase-05-spark-exporter-training.md)
-6. [Phase 6: RFC Scoring Service](phase-06-rfc-scoring-service.md)
+6. [Phase 6: RFC Scoring Service](phase-06-rfc-scoring-service.md) **(implemented)**
 7. [Phase 7: Moderation TF-IDF And OpenAI Gate](phase-07-moderation-tfidf-openai.md)
 8. [Phase 8: Finding Ad Process](phase-08-finding-ad-process.md)
 

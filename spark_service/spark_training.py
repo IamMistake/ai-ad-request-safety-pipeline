@@ -3,6 +3,11 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
 
 import joblib
 import pandas as pd
@@ -15,30 +20,20 @@ from sklearn.metrics import (
     precision_recall_fscore_support,
 )
 
-
-SCAM_REGEX = r"(hack|bitcoin|generator|credit card|loan|scam|earn money fast|click here)"
-UA_SIGNAL_REASONS = {"bad_user_agent", "publisher_bad_ua_rate"}
-BURST_SIGNAL_REASONS = {
-    "ip_burst",
-    "session_burst",
-    "publisher_burst",
-    "regular_cadence",
-}
+from shared.rfc_features import (
+    BURST_SIGNAL_REASONS,
+    FEATURE_COLUMNS,
+    SCAM_REGEX,
+    SCAM_REGEX_COMPILED,
+    UA_SIGNAL_REASONS,
+    extract_rfc_features,
+    feature_vector,
+)
 
 DEFAULT_INPUT = "spark_service/data/request_logs.json"
 DEFAULT_OUTPUT_DIR = "spark_service/output"
 DEFAULT_MIN_ROWS = 10
 DEFAULT_MODEL_THRESHOLD = 0.5
-
-FEATURE_COLUMNS = [
-    "flink_fraud_score",
-    "asn",
-    "prompt_length",
-    "contains_scam_keyword",
-    "flink_reason_count",
-    "has_user_agent_signal",
-    "has_burst_signal",
-]
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

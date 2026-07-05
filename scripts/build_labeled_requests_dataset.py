@@ -192,7 +192,7 @@ def synthetic_asn(identity: str, country: str) -> int:
 
 def random_publisher_weights(rnd: random.Random) -> dict[str, float]:
     weights = {publisher_id: rnd.uniform(0.5, 4.0) for publisher_id, _ in PUBLISHERS}
-    weights["publisher_bad_01"] *= 0.8
+    weights["publisher_bad_01"] *= 0.01
     for publisher_id, profile in PUBLISHERS:
         if profile == "clean":
             weights[publisher_id] *= 1.3
