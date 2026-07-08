@@ -29,15 +29,15 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant Sim as Requests Sender
+    participant Sender as Requests Sender
     participant Kafka as Kafka Broker
-    participant Flink as Flink Fraud Starter
+    participant Flink as Flink Fraud
     participant RFC as RFC Scoring Service
     participant Mod as Moderation Service
     participant Ad as Ad Injection
     participant Spark as Spark Analytics
 
-    Sim->>Kafka: Publish raw request to requests.raw
+    Sender->>Kafka: Publish raw request to requests.raw
     Kafka->>Flink: Deliver raw request
     Flink-->>Kafka: Publish clean request to requests.clean
     Flink-->>Kafka: Publish suspicious request to requests.sus
@@ -80,11 +80,12 @@ sequenceDiagram
 | Requests Sender | Replay labeled request events and publish raw payloads | `kafka/producers/requests_sender.py` |
 | Kafka Broker | Buffer, partition, and distribute events | `docker-compose.yml` |
 | Debug Consumer | Inspect messages during local development | `test_consumer.py` |
-| Flink Fraud Starter | Current clean-by-default stream gate; rules will be added one by one | `flink_service/fraud_detection.py` |
-| RFC Scoring Service | Score suspicious requests with the offline-trained model | Planned in `scoring_service/` |
+| Flink Fraud | Real-time fraud detection with session and publisher rules | `flink_service/fraud_detection.py` |
+| RFC Scoring Service | Score suspicious requests with the offline-trained RandomForest model | `scoring_service/rfc_scoring_service.py` |
 | Moderation Service | Call the moderation provider and forward approved requests | `pipeline_consumers/moderation_consumer.py` |
 | Ad Injection Consumer | Consume fully approved requests | `pipeline_consumers/ad_injection_consumer.py` |
-| Spark Analytics | Not planned in detail yet | `spark_service/spark_training.py` |
+| Historical Exporter | Export Flink output joined with offline labels for Spark training | `spark_service/historical_exporter.py` |
+| Spark Training | Train RandomForestClassifier from exported logs | `spark_service/spark_training.py` |
 
 ## Architectural Characteristics
 
@@ -111,11 +112,12 @@ and historical aggregation.
 
 | Area | Current prototype note |
 | --- | --- |
-| Kafka usage | Target active topics are `requests.raw`, `requests.sus`, `requests.clean`, `requests.fraud`, and `ad.injection` |
-| Flink processing | Reset to a small starter fraud gate for incremental cleanup |
-| RFC scoring service | Planned service for model-based suspicious request scoring |
+| Kafka usage | Active topics: `requests.raw`, `requests.sus`, `requests.clean`, `requests.fraud`, `ad.injection` |
+| Flink processing | Session + publisher detectors with 17 rules; score-based routing to clean/sus/fraud |
+| RFC scoring service | Implemented prototype consuming `requests.sus`, classifying via Spark-trained RandomForest model |
 | Moderation service | Prototype exists with `.env` configuration and OpenAI-ready provider support |
-| Spark training | Existing prototype is parked until a new plan is written |
+| Spark training | Implemented: `historical_exporter.py` + `spark_training.py` writes RFC model artifacts |
+| Pipeline results | See `results/pipeline_run_3.md` for latest confusion matrix and attack-type breakdown |
 
 ## Future Agents Guidance
 
