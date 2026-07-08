@@ -3,14 +3,20 @@ import re
 from flink_service.constants import (
     ASN_RISK_SCORE,
     BAD_USER_AGENT_SCORE,
+    GEO_LANGUAGE_MISMATCH_SCORE,
     HIGH_RISK_ASNS,
-    LANGUAGE_MISMATCH_COUNTRY_SCORE,
     NEGATIVE_PROMPT_SCORE,
 )
 from shared.language_profiles import LANGUAGE_ALIASES, LANGUAGE_COUNTRIES
 from shared.schemas import RawRequestEvent
 
 RuleResult = tuple[float, str | None]
+
+# Reverse mapping: country → set of expected languages
+COUNTRY_LANGUAGES: dict[str, set[str]] = {}
+for lang, countries in LANGUAGE_COUNTRIES.items():
+    for c in countries:
+        COUNTRY_LANGUAGES.setdefault(c, set()).add(lang)
 
 NEGATIVE_PROMPT_PATTERN = re.compile(
     r"\b(wtf|wth|ffs|omfg|shit(ty|tiest)?|dumbass|horrible|awful|"
@@ -47,7 +53,7 @@ def rule_asn_risk(request: RawRequestEvent) -> RuleResult:
     return 0.0, None
 
 
-def rule_language_mismatch_country(request: RawRequestEvent) -> RuleResult:
+def rule_geo_language_mismatch(request: RawRequestEvent) -> RuleResult:
     language = LANGUAGE_ALIASES.get(
         request.language.strip().lower(),
         request.language.strip().lower(),
@@ -57,9 +63,16 @@ def rule_language_mismatch_country(request: RawRequestEvent) -> RuleResult:
     if not language or language in {"unknown", "english"} or not country:
         return 0.0, None
 
-    allowed_countries = LANGUAGE_COUNTRIES.get(language)
-    if allowed_countries and country not in allowed_countries:
-        return LANGUAGE_MISMATCH_COUNTRY_SCORE, "language_mismatch_country"
+    expected_countries_for_lang = LANGUAGE_COUNTRIES.get(language)
+    expected_langs_for_country = COUNTRY_LANGUAGES.get(country)
+
+    # Double-check: trigger only when BOTH directions mismatch
+    if expected_countries_for_lang and expected_langs_for_country:
+        lang_ok = country in expected_countries_for_lang
+        country_ok = language in expected_langs_for_country
+        if not lang_ok and not country_ok:
+            return GEO_LANGUAGE_MISMATCH_SCORE, "geo_language_mismatch"
+
     return 0.0, None
 
 
@@ -81,5 +94,5 @@ RULES = [
     rule_negative_prompt,
     rule_bad_user_agent,
     rule_asn_risk,
-    rule_language_mismatch_country,
+    rule_geo_language_mismatch,
 ]

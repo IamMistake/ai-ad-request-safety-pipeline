@@ -1,3 +1,5 @@
+import base64
+import binascii
 import json
 
 from pyflink.common import Types
@@ -10,7 +12,14 @@ from flink_service.constants import (
     PUBLISHER_BAD_UA_RATE_THRESHOLD,
     PUBLISHER_BURST_MAX_REQUESTS,
     PUBLISHER_BURST_SCORE,
+    PUBLISHER_BURST_VOLUME_SCORE,
     PUBLISHER_BURST_WINDOW_SECONDS,
+    PUBLISHER_COMPOUND_FARM_RATIO,
+    PUBLISHER_COMPOUND_FARM_SCORE,
+    PUBLISHER_DISPERSION_WINDOW_SECONDS,
+    PUBLISHER_FLAGGED_EXCLUDE_REASONS,
+    PUBLISHER_NEW_IP_SCORE,
+    PUBLISHER_NEW_SESSION_SCORE,
     PUBLISHER_RATE_WINDOW_SECONDS,
     PUBLISHER_SUSPICIOUS_RATE_MIN_REQUESTS,
     PUBLISHER_SUSPICIOUS_RATE_SCORE,
@@ -34,6 +43,10 @@ def _is_bad_user_agent(user_agent: str) -> bool:
     return False
 
 
+def _encode_value(value: str) -> str:
+    return base64.urlsafe_b64encode(value.encode("utf-8")).decode("ascii")
+
+
 def _recent_observations(
     state, timestamp_ms: int, window_seconds: int
 ) -> list[tuple[int, bool, bool]]:
@@ -54,6 +67,57 @@ def _recent_observations(
     return observations
 
 
+def _recent_unique_values(
+    state, timestamp_ms: int, window_seconds: int
+) -> set[str]:
+    window_start_ms = timestamp_ms - (window_seconds * 1000)
+    values: set[str] = set()
+
+    for entry in state.get() or []:
+        try:
+            parts = entry.split("|", 1)
+            ts = int(parts[0])
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if ts >= window_start_ms:
+            decoded = _decode_value(parts[1]) if len(parts) > 1 else ""
+            values.add(decoded)
+
+    return values
+
+
+def _maintain_tracked_values(
+    state, timestamp_ms: int, window_seconds: int, new_value: str
+) -> set[str]:
+    window_start_ms = timestamp_ms - (window_seconds * 1000)
+    values: set[str] = set()
+    entries: list[str] = []
+
+    for entry in state.get() or []:
+        try:
+            parts = entry.split("|", 1)
+            ts = int(parts[0])
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if ts >= window_start_ms:
+            decoded = _decode_value(parts[1]) if len(parts) > 1 else ""
+            values.add(decoded)
+            entries.append(entry)
+
+    encoded_new = _encode_value(new_value)
+    entries.append(f"{timestamp_ms}|{encoded_new}")
+    values.add(new_value)
+    state.update(entries)
+    return values
+
+
+def _decode_value(value: str) -> str:
+    try:
+        return base64.urlsafe_b64decode(value.encode("ascii")).decode("utf-8")
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        return value
+
+
 class PublisherFraudDetector(KeyedProcessFunction):
     def open(self, runtime_context: RuntimeContext) -> None:
         ts_descriptor = ListStateDescriptor(
@@ -64,6 +128,18 @@ class PublisherFraudDetector(KeyedProcessFunction):
             "recent_publisher_observations", Types.STRING()
         )
         self.recent_observations = runtime_context.get_list_state(obs_descriptor)
+        ip_descriptor = ListStateDescriptor(
+            "publisher_seen_ips", Types.STRING()
+        )
+        self.publisher_ips = runtime_context.get_list_state(ip_descriptor)
+        session_descriptor = ListStateDescriptor(
+            "publisher_seen_sessions", Types.STRING()
+        )
+        self.publisher_sessions = runtime_context.get_list_state(session_descriptor)
+        disp_ts_descriptor = ListStateDescriptor(
+            "publisher_dispersion_timestamps", Types.LONG()
+        )
+        self.dispersion_timestamps = runtime_context.get_list_state(disp_ts_descriptor)
 
     def process_element(self, value: str, ctx: "KeyedProcessFunction.Context"):
         event = load_event(value)
@@ -89,12 +165,11 @@ class PublisherFraudDetector(KeyedProcessFunction):
             yield json.dumps(DetectionResult(request, score, reasons).to_dict())
             return
 
-        # --- publisher_burst ---
-        window_start_ms = event_timestamp_ms - (PUBLISHER_BURST_WINDOW_SECONDS * 1000)
+        burst_window_ms = event_timestamp_ms - (PUBLISHER_BURST_WINDOW_SECONDS * 1000)
         recent_timestamps = [
             ts
             for ts in (self.recent_timestamps.get() or [])
-            if ts >= window_start_ms
+            if ts >= burst_window_ms
         ]
         recent_timestamps.append(event_timestamp_ms)
         self.recent_timestamps.update(recent_timestamps)
@@ -103,8 +178,11 @@ class PublisherFraudDetector(KeyedProcessFunction):
             score += PUBLISHER_BURST_SCORE
             reasons.append("publisher_burst")
 
-        # --- publisher_suspicious_rate & publisher_bad_ua_rate ---
-        was_flagged_by_prior = len(result.stateful_reasons) > 0
+        flagged_reasons = [
+            r for r in result.stateful_reasons
+            if r not in PUBLISHER_FLAGGED_EXCLUDE_REASONS
+        ]
+        was_flagged_by_prior = len(flagged_reasons) > 0
         is_bad_ua = _is_bad_user_agent(request.request_context.user_agent)
 
         observations = _recent_observations(
@@ -132,5 +210,61 @@ class PublisherFraudDetector(KeyedProcessFunction):
         ):
             score += PUBLISHER_BAD_UA_RATE_SCORE
             reasons.append("publisher_bad_ua_rate")
+
+        disp_ts = event_timestamp_ms
+
+        user_ip = request.request_context.user_ip.strip()
+        session_id = request.request_context.session_id.strip()
+
+        prior_ips = _recent_unique_values(
+            self.publisher_ips, disp_ts, PUBLISHER_DISPERSION_WINDOW_SECONDS
+        )
+        prior_sessions = _recent_unique_values(
+            self.publisher_sessions, disp_ts, PUBLISHER_DISPERSION_WINDOW_SECONDS
+        )
+
+        is_new_ip = user_ip not in prior_ips
+        is_new_session = session_id not in prior_sessions
+
+        _maintain_tracked_values(
+            self.publisher_ips, disp_ts, PUBLISHER_DISPERSION_WINDOW_SECONDS, user_ip
+        )
+        _maintain_tracked_values(
+            self.publisher_sessions, disp_ts, PUBLISHER_DISPERSION_WINDOW_SECONDS,
+            session_id
+        )
+
+        if is_new_ip:
+            score += PUBLISHER_NEW_IP_SCORE
+            reasons.append("publisher_new_ip")
+
+        if is_new_session:
+            score += PUBLISHER_NEW_SESSION_SCORE
+            reasons.append("publisher_new_session")
+
+        unique_ip_count = len(prior_ips) + (1 if is_new_ip else 0)
+
+        disp_window_ms = disp_ts - (PUBLISHER_DISPERSION_WINDOW_SECONDS * 1000)
+        recent_disp_ts = [
+            ts for ts in (self.dispersion_timestamps.get() or [])
+            if ts >= disp_window_ms
+        ]
+        recent_disp_ts.append(disp_ts)
+        self.dispersion_timestamps.update(recent_disp_ts)
+        total_in_window = len(recent_disp_ts)
+
+        if total_in_window > 0:
+            dispersion_ratio = unique_ip_count / total_in_window
+            if is_new_ip and is_new_session and dispersion_ratio > PUBLISHER_COMPOUND_FARM_RATIO:
+                score += PUBLISHER_COMPOUND_FARM_SCORE
+                reasons.append("publisher_dispersed_farm")
+
+        ips_in_burst_window = _recent_unique_values(
+            self.publisher_ips, event_timestamp_ms, PUBLISHER_BURST_WINDOW_SECONDS
+        )
+        unique_ips_burst = len(ips_in_burst_window)
+        if len(recent_timestamps) >= 20 and unique_ips_burst > 0 and len(recent_timestamps) / unique_ips_burst >= 6:
+            score += PUBLISHER_BURST_VOLUME_SCORE
+            reasons.append("publisher_burst_volume")
 
         yield json.dumps(DetectionResult(request, score, reasons).to_dict())

@@ -35,7 +35,8 @@ class RegularCadenceInjector:
 
         publisher_id = rnd.choice(candidate_publishers)
         profile = publisher_profiles[publisher_id]
-        source = rnd.choice(clean_rows)
+        publisher_rows = [r for r in clean_rows if r["event"].get("publisher_id") == publisher_id]
+        source = rnd.choice(publisher_rows) if publisher_rows else rnd.choice(clean_rows)
         source_event = source["event"]
         source_prompt = source_event["prompt"]
         source_country = source_event.get("optional_context", {}).get("country", "US")
@@ -52,6 +53,8 @@ class RegularCadenceInjector:
             session_time = base_time + timedelta(seconds=index * interval_seconds)
 
             event = copy.deepcopy(source_event)
+            if "optional_context" not in event:
+                event["optional_context"] = {}
             event["event_time"] = session_time.isoformat()
             event["req_id"] = f"regular_cadence_{index:04d}"
             event["prompt"] = source_prompt
