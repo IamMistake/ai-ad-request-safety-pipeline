@@ -2,6 +2,8 @@ import json
 import sys
 from pathlib import Path
 
+from kafka import KafkaProducer
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
@@ -11,12 +13,10 @@ from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.watermark_strategy import TimestampAssigner, WatermarkStrategy
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import (
-    DeliveryGuarantee,
     KafkaOffsetsInitializer,
-    KafkaRecordSerializationSchema,
-    KafkaSink,
     KafkaSource,
 )
+from pyflink.datastream.functions import MapFunction
 
 from flink_service.constants import (
     FRAUD_CONSUMER_GROUP,
@@ -144,19 +144,28 @@ def format_log_line(routed_value: str) -> str:
     )
 
 
-def build_kafka_sink(topic: str) -> KafkaSink:
-    return (
-        KafkaSink.builder()
-        .set_bootstrap_servers(KAFKA_BOOTSTRAP)
-        .set_record_serializer(
-            KafkaRecordSerializationSchema.builder()
-            .set_topic(topic)
-            .set_value_serialization_schema(SimpleStringSchema())
-            .build()
+class KafkaForwardingLogFunction(MapFunction):
+    def open(self, runtime_context):
+        self.producer = KafkaProducer(
+            bootstrap_servers=KAFKA_BOOTSTRAP,
+            value_serializer=lambda value: value.encode("utf-8"),
+            linger_ms=0,
         )
-        .set_delivery_guarantee(DeliveryGuarantee.NONE)
-        .build()
-    )
+
+    def map(self, routed_value: str) -> str:
+        verdict = route_key(routed_value)
+        target_topic = REQUESTS_CLEAN_TOPIC
+        if verdict == "suspicious":
+            target_topic = REQUESTS_SUS_TOPIC
+        elif verdict == "fraud":
+            target_topic = REQUESTS_FRAUD_TOPIC
+
+        self.producer.send(target_topic, routed_value)
+        self.producer.flush()
+        return format_log_line(routed_value)
+
+    def close(self):
+        self.producer.close()
 
 
 def build_kafka_source(topic: str) -> KafkaSource:
@@ -220,17 +229,7 @@ def main() -> None:
     )
     routed = publisher_detection_results.map(route_request, output_type=Types.STRING())
 
-    routed.filter(lambda raw: route_key(raw) == "clean").sink_to(
-        build_kafka_sink(REQUESTS_CLEAN_TOPIC)
-    )
-    routed.filter(lambda raw: route_key(raw) == "suspicious").sink_to(
-        build_kafka_sink(REQUESTS_SUS_TOPIC)
-    )
-    routed.filter(lambda raw: route_key(raw) == "fraud").sink_to(
-        build_kafka_sink(REQUESTS_FRAUD_TOPIC)
-    )
-
-    routed.map(format_log_line, output_type=Types.STRING()).print()
+    routed.map(KafkaForwardingLogFunction(), output_type=Types.STRING()).print()
 
     env.execute(FRAUD_JOB_NAME)
 

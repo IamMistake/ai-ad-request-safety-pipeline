@@ -60,13 +60,13 @@ def load_model_artifacts(model_dir: Path):
     return model, feature_columns, metadata
 
 
-def build_kafka_consumer(group_id: str) -> KafkaConsumer:
+def build_kafka_consumer(group_id: str, from_beginning: bool) -> KafkaConsumer:
     """Build Kafka consumer for requests.sus topic."""
     return KafkaConsumer(
         REQUESTS_SUS_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
         api_version=KAFKA_API_VERSION,
-        auto_offset_reset="latest",
+        auto_offset_reset="earliest" if from_beginning else "latest",
         enable_auto_commit=False,
         group_id=group_id,
         value_deserializer=lambda value: json.loads(value.decode("utf-8")),
@@ -165,6 +165,23 @@ def main():
         default=DEFAULT_CONSUMER_GROUP,
         help=f"Kafka consumer group id (default: {DEFAULT_CONSUMER_GROUP})",
     )
+    parser.add_argument(
+        "--from-beginning",
+        action="store_true",
+        help="Consume existing requests.sus messages from earliest offsets.",
+    )
+    parser.add_argument(
+        "--max-messages",
+        type=int,
+        default=0,
+        help="Stop after processing N messages (0 = run forever).",
+    )
+    parser.add_argument(
+        "--idle-seconds",
+        type=int,
+        default=0,
+        help="Stop after N idle seconds without messages (0 = run forever).",
+    )
     args = parser.parse_args()
 
     model_dir = Path(args.model_dir)
@@ -186,17 +203,28 @@ def main():
 
     print(
         f"[rfc-scoring] Starting: model_version={model_version}, "
-        f"threshold={threshold}, group_id={args.group_id}"
+        f"threshold={threshold}, group_id={args.group_id}, "
+        f"from_beginning={args.from_beginning}"
     )
 
-    consumer = build_kafka_consumer(args.group_id)
+    consumer = build_kafka_consumer(args.group_id, args.from_beginning)
     producer = build_kafka_producer()
+    processed = 0
+    idle_seconds = 0
 
     try:
         while True:
             records = consumer.poll(timeout_ms=1000)
             if not records:
+                idle_seconds += 1
+                if args.idle_seconds > 0 and idle_seconds >= args.idle_seconds:
+                    print(
+                        f"[rfc-scoring] No messages for {idle_seconds}s. "
+                        f"Stopping after processed={processed}."
+                    )
+                    break
                 continue
+            idle_seconds = 0
 
             for batch in records.values():
                 for msg in batch:
@@ -223,6 +251,10 @@ def main():
                     try:
                         producer.flush()
                         consumer.commit()
+                        processed += 1
+                        if args.max_messages > 0 and processed >= args.max_messages:
+                            print(f"[rfc-scoring] Reached max messages: {processed}")
+                            return
                     except Exception as exc:
                         print(
                             f"[rfc-scoring] Producer/commit failure for req_id={req_id}: {exc}",

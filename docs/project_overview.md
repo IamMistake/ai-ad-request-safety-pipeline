@@ -77,7 +77,7 @@ flowchart LR
 | `docs/moderation_service.md` | Moderation responsibilities and near-term plan |
 | `docs/implementation_status.md` | Current implementation state and pipeline run results |
 | `docs/new_architecture_plan/` | Phased plan for the new topic and service architecture |
-| `results/pipeline_run_3.md` | Full metrics from the latest Flink pipeline run |
+| `results/pipeline_run_6.md` | Latest full Kafka streaming validation for Flink + RFC |
 
 ## Current Engineering Position
 
@@ -90,6 +90,6 @@ Current emphasis:
 - preserve the architecture
 - extend the implementation incrementally
 - keep Kafka, Flink, moderation, and Spark as the core pipeline
-- push Flink rule coverage toward 70% fraud TPR with <1,000 false positives
-- bridge the gap with RFC scoring for the remaining suspicious traffic
+- keep the validated Flink + RFC loop above 70% fraud TPR with <1,000 false positives
+- finish moderation, ad finding, orchestration, and automated regression checks
 - document the intended behavior clearly enough for future AI agents to resume work immediately

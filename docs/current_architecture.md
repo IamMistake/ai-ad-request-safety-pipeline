@@ -113,11 +113,11 @@ and historical aggregation.
 | Area | Current prototype note |
 | --- | --- |
 | Kafka usage | Active topics: `requests.raw`, `requests.sus`, `requests.clean`, `requests.fraud`, `ad.injection` |
-| Flink processing | Session + publisher detectors with 17 rules; score-based routing to clean/sus/fraud |
-| RFC scoring service | Implemented prototype consuming `requests.sus`, classifying via Spark-trained RandomForest model |
+| Flink processing | Session + publisher detectors with 20 rules; optimized Run 5 routing at `SUS=0.30`, `FRAUD=0.70` |
+| RFC scoring service | Implemented Kafka scorer consuming `requests.sus`; supports repeatable `--from-beginning` smoke runs |
 | Moderation service | Prototype exists with `.env` configuration and OpenAI-ready provider support |
 | Spark training | Implemented: `historical_exporter.py` + `spark_training.py` writes RFC model artifacts |
-| Pipeline results | See `results/pipeline_run_3.md` for latest confusion matrix and attack-type breakdown |
+| Pipeline results | Latest full Kafka validation: Run 6 reached 77.73% TPR and 157 FP; see `results/pipeline_run_6.md` |
 
 ## Future Agents Guidance
 

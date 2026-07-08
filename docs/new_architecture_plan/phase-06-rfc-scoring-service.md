@@ -10,6 +10,7 @@ Implementation details:
 - `spark_service/spark_training.py` imports feature constants from the shared module.
 - `shared/events.py:add_rfc_context()` now accepts and includes `threshold`.
 - Manual offset commit after successful producer flush.
+- Repeatable validation options: `--from-beginning`, `--max-messages`, and `--idle-seconds`.
 - Smoke tests: `python scripts/smoke_rfc_scoring.py`.
 
 ## Goal
@@ -109,6 +110,16 @@ Model artifacts must be generated first by the Phase 05 Spark flow:
 ```bash
 python spark_service/spark_training.py --input spark_service/data/request_logs.json
 python scoring_service/rfc_scoring_service.py --threshold 0.5
+```
+
+For repeatable offline validation against existing SUS messages:
+
+```bash
+python scoring_service/rfc_scoring_service.py \
+  --from-beginning \
+  --group-id rfc-validation-$(date +%s) \
+  --max-messages 4122 \
+  --idle-seconds 10
 ```
 
 ## Definition Of Done

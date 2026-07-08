@@ -2,10 +2,10 @@
 
 ## Status
 
-Reset in `flink_service/fraud_detection.py`, `flink_service/events.py`, and
-`flink_service/constants.py`. The old stateful detector, publisher profiler,
-session analytics, and helper modules were deleted so rules can be rebuilt one
-by one.
+Implemented and optimized. Current routing thresholds are `SUS=0.30` and
+`FRAUD=0.70`; Run 6 reached 77.73% TPR and 157 FP through the real Kafka Flink
++ RFC path. Flink output uses explicit Python Kafka forwarding for local
+prototype reliability.
 
 ## Goal
 
@@ -35,9 +35,9 @@ moderation.requests
 ## Scoring Thresholds
 
 ```text
-score < 0.5          -> clean
-0.5 <= score < 0.8   -> suspicious
-score >= 0.8         -> fraud
+score < 0.30          -> clean
+0.30 <= score < 0.70  -> suspicious
+score >= 0.70         -> fraud
 ```
 
 Score must be capped:

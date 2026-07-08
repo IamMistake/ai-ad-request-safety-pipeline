@@ -6,7 +6,8 @@ Updated flow: dataset rows now pass through Flink before Spark training. Spark
 trains from Flink-enriched exported rows joined with the offline labeled
 dataset. The exporter no longer reads all five topics; it reads only Flink
 output topics. The model artifact is persisted with `joblib` as
-`fraud_model.joblib`.
+`fraud_model.joblib`. Run 5 retrained the RFC model on the optimized Flink
+distribution and reached 99.13% test accuracy with 0.986 SUS-topic F1.
 
 ## Goal
 
