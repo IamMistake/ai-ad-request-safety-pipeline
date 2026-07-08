@@ -1,0 +1,9 @@
+[
+  "flink_fraud_score",
+  "asn",
+  "prompt_length",
+  "contains_scam_keyword",
+  "flink_reason_count",
+  "has_user_agent_signal",
+  "has_burst_signal"
+]

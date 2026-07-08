@@ -1,0 +1,61 @@
+{
+  "rows_used": 27607,
+  "feature_columns": [
+    "flink_fraud_score",
+    "asn",
+    "prompt_length",
+    "contains_scam_keyword",
+    "flink_reason_count",
+    "has_user_agent_signal",
+    "has_burst_signal"
+  ],
+  "label_column": "is_fraud",
+  "accuracy": 0.9833393697935531,
+  "classification_report": {
+    "0": {
+      "precision": 0.9948642699926632,
+      "recall": 0.9828460980913264,
+      "f1-score": 0.988818667963053,
+      "support": 4139.0
+    },
+    "1": {
+      "precision": 0.9504535938590369,
+      "recall": 0.9848156182212582,
+      "f1-score": 0.9673295454545454,
+      "support": 1383.0
+    },
+    "accuracy": 0.9833393697935531,
+    "macro avg": {
+      "precision": 0.9726589319258501,
+      "recall": 0.9838308581562922,
+      "f1-score": 0.9780741067087992,
+      "support": 5522.0
+    },
+    "weighted avg": {
+      "precision": 0.9837414947132708,
+      "recall": 0.9833393697935531,
+      "f1-score": 0.9834366584684376,
+      "support": 5522.0
+    }
+  },
+  "metrics_by_flink_topic": {
+    "requests.clean": {
+      "rows": 1641,
+      "precision": 0.9824561403508771,
+      "recall": 0.9889624724061811,
+      "f1": 0.9856985698569857
+    },
+    "requests.fraud": {
+      "rows": 3185,
+      "precision": 0.9399367755532139,
+      "recall": 0.9889135254988913,
+      "f1": 0.9638033495407887
+    },
+    "requests.sus": {
+      "rows": 696,
+      "precision": 0.7857142857142857,
+      "recall": 0.7857142857142857,
+      "f1": 0.7857142857142857
+    }
+  }
+}

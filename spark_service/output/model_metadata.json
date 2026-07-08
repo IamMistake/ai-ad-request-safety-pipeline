@@ -1,0 +1,17 @@
+{
+  "model_version": "rfc-local-20260708-164036",
+  "model_type": "RandomForestClassifier",
+  "created_at": "2026-07-08T16:40:36.932917+00:00",
+  "feature_columns": [
+    "flink_fraud_score",
+    "asn",
+    "prompt_length",
+    "contains_scam_keyword",
+    "flink_reason_count",
+    "has_user_agent_signal",
+    "has_burst_signal"
+  ],
+  "threshold_default": 0.5,
+  "training_rows": 27607,
+  "label_policy": "Labels from offline labeled dataset joined by req_id; is_fraud=1 rows are positives; is_fraud=0 rows are negatives; training covers requests.clean, requests.sus, and requests.fraud Flink outputs."
+}
