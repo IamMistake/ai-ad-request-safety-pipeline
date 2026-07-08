@@ -36,3 +36,4 @@ AGENTS.md
 datasets/
 .omo/*
 spark_service/data/
+results/

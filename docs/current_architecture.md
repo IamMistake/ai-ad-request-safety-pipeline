@@ -117,7 +117,7 @@ and historical aggregation.
 | RFC scoring service | Implemented Kafka scorer consuming `requests.sus`; supports repeatable `--from-beginning` smoke runs |
 | Moderation service | Prototype exists with `.env` configuration and OpenAI-ready provider support |
 | Spark training | Implemented: `historical_exporter.py` + `spark_training.py` writes RFC model artifacts |
-| Pipeline results | Latest full Kafka validation: Run 6 reached 77.73% TPR and 157 FP; see `results/pipeline_run_6.md` |
+| Pipeline results | Latest full Kafka validation: Run 6 reached 77.73% TPR and 157 FP; see `docs/pipeline_results.md` |
 
 ## Future Agents Guidance
 

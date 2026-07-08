@@ -77,7 +77,7 @@ flowchart LR
 | `docs/moderation_service.md` | Moderation responsibilities and near-term plan |
 | `docs/implementation_status.md` | Current implementation state and pipeline run results |
 | `docs/new_architecture_plan/` | Phased plan for the new topic and service architecture |
-| `results/pipeline_run_6.md` | Latest full Kafka streaming validation for Flink + RFC |
+| `docs/pipeline_results.md` | Latest full Kafka streaming validation for Flink + RFC |
 
 ## Current Engineering Position
 

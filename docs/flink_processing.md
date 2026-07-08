@@ -107,7 +107,7 @@ RULES = [
 
 ## Pipeline Run Results
 
-Full latest streaming details in `results/pipeline_run_6.md`.
+Full latest streaming details in `docs/pipeline_results.md`.
 
 | Metric | Run 4 (before optimization) | Run 6 (full Kafka Flink + RFC) | Target |
 |--------|-----------------------------|---------------------|--------|

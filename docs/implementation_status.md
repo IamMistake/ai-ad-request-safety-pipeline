@@ -48,7 +48,7 @@ Requests Sender
 
 ## Pipeline Run 5 Results (2026-07-08)
 
-Full streaming details: `results/pipeline_run_6.md`.
+Full streaming details: `docs/pipeline_results.md`.
 
 | Metric | Value | Target |
 | --- | ---: | ---: |
