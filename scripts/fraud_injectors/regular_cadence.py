@@ -42,15 +42,16 @@ class RegularCadenceInjector:
         source_country = source_event.get("optional_context", {}).get("country", "US")
         source_language = source_event.get("language", "unknown")
         source_ua = source_event["request_context"]["user_agent"]
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.fromisoformat(source_event["event_time"])
         interval_seconds = 2.0
 
         rows = []
         row_count = 800
 
         for index in range(row_count):
-            session_id = f"cadence_session_{self._attack_id}_{index:04d}"
-            session_time = base_time + timedelta(seconds=index * interval_seconds)
+            batch_idx = index // 4
+            session_id = hashlib.sha256(f"{self._attack_id}:{batch_idx}".encode()).hexdigest()[:32]
+            session_time = base_time + timedelta(seconds=batch_idx * 60 + (index % 4) * interval_seconds)
 
             event = copy.deepcopy(source_event)
             if "optional_context" not in event:

@@ -34,14 +34,15 @@ class SlowPrompReplayInjector:
         source_country = source_event.get("optional_context", {}).get("country", "US")
         source_language = source_event.get("language", "unknown")
         source_ua = source_event["request_context"]["user_agent"]
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.fromisoformat(source_event["event_time"])
 
         rows = []
         row_count = 1600
 
         for index in range(row_count):
-            session_id = f"replay_fake_session_{self._attack_id}_{index:04d}"
-            session_time = base_time + timedelta(seconds=index * rnd.randint(5, 15))
+            batch_idx = index // 8
+            session_id = hashlib.sha256(f"{self._attack_id}:{batch_idx}".encode()).hexdigest()[:32]
+            session_time = base_time + timedelta(seconds=batch_idx * rnd.randint(40, 200) + (index % 8) * rnd.randint(2, 8))
 
             event = copy.deepcopy(source_event)
             if "optional_context" not in event:

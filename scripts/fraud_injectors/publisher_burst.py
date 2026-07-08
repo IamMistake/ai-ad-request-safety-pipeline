@@ -41,7 +41,7 @@ class PublisherBurstInjector:
         source_country = source_event.get("optional_context", {}).get("country", "US")
         source_language = source_event.get("language", "unknown")
         source_ua = source_event["request_context"]["user_agent"]
-        burst_start = datetime.now(timezone.utc)
+        burst_start = datetime.fromisoformat(source_event["event_time"])
 
         rows = []
         session_count = 16
@@ -49,7 +49,7 @@ class PublisherBurstInjector:
         session_interval = 1.2
 
         for session_index in range(session_count):
-            session_id = f"burst_session_{self._attack_id}_{session_index:04d}"
+            session_id = hashlib.sha256(f"{self._attack_id}:{session_index}".encode()).hexdigest()[:32]
             session_ip = _stable_ip(session_id, source_country)
             session_asn = _stable_asn(session_id, source_country)
 

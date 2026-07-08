@@ -51,14 +51,15 @@ class UaRotationInjector:
         source_prompt = source_event["prompt"]
         source_country = source_event.get("optional_context", {}).get("country", "US")
         source_language = source_event.get("language", "unknown")
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.fromisoformat(source_event["event_time"])
 
         rows = []
         row_count = 1200
 
         for index in range(row_count):
-            session_id = f"ua_rotate_session_{self._attack_id}_{index:04d}"
-            session_time = base_time + timedelta(seconds=index * rnd.randint(3, 10))
+            batch_idx = index // 6
+            session_id = hashlib.sha256(f"{self._attack_id}:{batch_idx}".encode()).hexdigest()[:32]
+            session_time = base_time + timedelta(seconds=batch_idx * rnd.randint(20, 120) + (index % 6) * rnd.randint(2, 6))
             ua = UA_POOL[index % len(UA_POOL)]
 
             event = copy.deepcopy(source_event)

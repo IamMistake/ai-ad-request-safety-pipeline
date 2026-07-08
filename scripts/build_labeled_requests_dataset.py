@@ -362,11 +362,11 @@ def main() -> None:
             f"Fraud injectors returned {len(fraud_rows)} rows, above total target {args.total_rows}."
         )
     rows = clean_rows[: args.total_rows - len(fraud_rows)] + fraud_rows
-    rnd.shuffle(rows)
 
     splits = split_rows(rows, rnd)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for split_name, split_rows_ in splits.items():
+        split_rows_.sort(key=lambda r: r["event"]["event_time"])
         write_jsonl(args.output_dir / f"{split_name}.jsonl", split_rows_)
     write_summary(args.output_dir / "dataset_summary.json", splits, args.seed)
 

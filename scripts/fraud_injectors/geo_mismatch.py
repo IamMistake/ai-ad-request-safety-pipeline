@@ -54,15 +54,16 @@ class GeoMismatchInjector:
         source_event = source["event"]
         source_prompt = source_event["prompt"]
         source_ua = source_event["request_context"]["user_agent"]
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.fromisoformat(source_event["event_time"])
 
         rows = []
         row_count = 1000
 
         for index in range(row_count):
+            batch_idx = index // 5
             language, country = rnd.choice(LANGUAGE_COUNTRY_MISMATCHES)
-            session_id = f"geo_mismatch_session_{self._attack_id}_{index:04d}"
-            session_time = base_time + timedelta(seconds=index * rnd.randint(5, 20))
+            session_id = hashlib.sha256(f"{self._attack_id}:{batch_idx}".encode()).hexdigest()[:32]
+            session_time = base_time + timedelta(seconds=batch_idx * rnd.randint(30, 180) + (index % 5) * rnd.randint(2, 8))
 
             event = copy.deepcopy(source_event)
             if "optional_context" not in event:
