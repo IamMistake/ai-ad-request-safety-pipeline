@@ -1,8 +1,6 @@
 # Implementation Status
 
-This is the current checkpoint after resetting Flink to a small starter job.
-The target architecture is preserved, but the previous Flink fraud rule maze was
-deleted so new rules can be added one by one.
+Current checkpoint after Pipeline Run 3: new detectors, tuned thresholds, verified hard ceiling.
 
 ## Intended Pipeline
 
@@ -26,7 +24,7 @@ Requests Sender
 | Requests sender | Implemented JSONL replay prototype; publishes only labeled-row `event` payloads to `requests.raw` | `kafka/producers/requests_sender.py`, `scripts/build_labeled_requests_dataset.py`, `scripts/fraud_injectors/` |
 | Shared topic constants | Implemented for active topics | `pipeline_consumers/constants.py` |
 | Debug consumer | Implemented for local topic inspection | `test_consumer.py` |
-| Flink starter | Implements IP burst, session-scoped scoring, publisher burst, stateless scoring rules, and score-based routing | `flink_service/fraud_detection.py`, `flink_service/user_detector.py`, `flink_service/session_detector.py`, `flink_service/publisher_detector.py`, `flink_service/rules.py`, `flink_service/events.py`, `flink_service/constants.py` |
+| Flink fraud detection | Implements IP burst, session-scoped scoring (burst, IP churn, UA churn, country hop, ASN churn, prompt replay, regular cadence), publisher-scoped scoring (burst, burst volume, suspicious rate, bad UA rate, dispersion/farm, prompt replay across sessions, geo diversity), stateless rules (negative prompt, bad UA, ASN risk, geo-language mismatch), and score-based routing | `flink_service/fraud_detection.py`, `flink_service/user_detector.py`, `flink_service/session_detector.py`, `flink_service/publisher_detector.py`, `flink_service/rules.py`, `flink_service/events.py`, `flink_service/constants.py` |
 | Shared event schemas | Implemented dataclass event models plus older dict helpers | `shared/schemas.py`, `shared/events.py` |
 | Shared RFC features | Implemented feature contract with online extractor shared by Spark training and RFC scoring | `shared/rfc_features.py` |
 | RFC scoring service | Implemented Kafka-only model-based scorer; consumes `requests.sus`, loads Spark artifacts, routes to `requests.clean` or `requests.fraud` | `scoring_service/rfc_scoring_service.py` |
@@ -36,95 +34,85 @@ Requests Sender
 | Historical exporter | Implemented prototype; consumes Flink output topics, joins offline labels by `req_id`, preserves full `feature_event` schema | `spark_service/historical_exporter.py` |
 | Smoke scripts | Present for manual flow checks and RFC scoring unit checks | `scripts/test_full_pipeline.sh`, `scripts/test_fraud_block_flow.sh`, `scripts/test_moderation_block_flow.sh`, `scripts/smoke_rfc_scoring.py` |
 
-## Simulator Current Behavior
-
-The requests sender no longer opens transformed Arrow shards directly. The current
-dataset path is:
+## Dataset & Sender
 
 1. Manually download WildChat into `datasets/WildChat/raw/` as `.parquet` or `.jsonl`.
 2. Run `python scripts/build_labeled_requests_dataset.py`.
-3. The builder writes `datasets/labeled_requests/train.jsonl`, `validation.jsonl`,
-   `test.jsonl`, and `dataset_summary.json`.
-4. Run `python kafka/producers/requests_sender.py` to replay `train.jsonl`, or
-   pass `--input` for another split.
+3. Writes `datasets/labeled_requests/train.jsonl`, `validation.jsonl`, `test.jsonl`, `dataset_summary.json`.
+4. Run `python kafka/producers/requests_sender.py` to replay `train.jsonl`.
 
-Labeled rows keep fraud metadata outside the raw Kafka payload. The requests sender
-publishes only `row["event"]` to `requests.raw`.
+Labeled rows keep fraud metadata outside the raw Kafka payload. The requests sender publishes only `row["event"]` to `requests.raw`.
 
 ## Flink Current Behavior
 
-`flink_service/fraud_detection.py` now does only this:
+`flink_service/fraud_detection.py`:
 
 1. Consume raw events from `requests.raw`.
 2. Parse JSON and assign event-time watermarks.
-3. Key events by `request_context.user_ip`.
-4. Apply `UserFraudDetector` stateful IP burst scoring.
-5. Key detection results by `request_context.session_id`.
-6. Apply `SessionFraudDetector` stateful session burst scoring.
-7. Key detection results by `publisher_id`.
-8. Apply `PublisherFraudDetector` stateful publisher scoring.
-9. Build typed fraud context with `shared.schemas.FraudContext`.
-10. Route `clean` to `requests.clean`, `suspicious` to `requests.sus`, and `fraud` to `requests.fraud`.
+3. Key events by `user_ip` → apply `UserFraudDetector` (IP burst).
+4. Key by `session_id` → apply `SessionFraudDetector`.
+5. Key by `publisher_id` → apply `PublisherFraudDetector`.
+6. Apply stateless rules from `flink_service/rules.py`.
+7. Route based on total score: `<0.45` → `requests.clean`, `0.45-0.55` → `requests.sus`, `≥0.55` → `requests.fraud`.
 
-Active Flink scoring thresholds:
+### Active Flink Rules
 
-```text
-score < 0.5        -> clean
-0.5 <= score < 0.8 -> suspicious
-score >= 0.8       -> fraud
-```
+#### Session-scoped
 
-Active Flink rule:
+| Rule | Score | Reason |
+| --- | --- | --- |
+| >12 requests in 60s | 0.4 | `session_burst` |
+| ≥2 unique IPs in 120s | 0.4 | `session_ip_churn` |
+| ≥2 unique UAs in 120s | 0.30 | `session_ua_churn` |
+| >2 countries in 120s | 0.5 | `session_country_hop` |
+| ≥2 unique ASNs in 120s | 0.4 | `session_asn_churn` |
+| ≥90% similar prompt in 300s | 0.4 | `prompt_replay` |
+| Last 4 intervals ≤250ms drift | 0.40 | `regular_cadence` |
 
-| Rule | Scope | Score | Reason |
-| --- | --- | --- | --- |
-| More than 8 requests in 60 seconds | `user_ip` | `0.6` | `ip_burst` |
-| More than 12 requests in 60 seconds | `session_id` | `0.4` | `session_burst` |
-| At least 2 unique IPs in 120 seconds | `session_id` | `0.4` | `session_ip_churn` |
-| More than 2 countries in 120 seconds | `session_id` | `0.5` | `session_country_hop` |
-| At least 2 unique ASNs in 120 seconds | `session_id` | `0.4` | `session_asn_churn` |
-| Same or at least 90% similar normalized prompt in 300 seconds | `session_id` | `0.4` | `prompt_replay` |
-| Last 4 request intervals differ by no more than 250ms | `session_id` | `0.3` | `regular_cadence` |
-| More than 100 requests in 60 seconds | `publisher_id` | `0.3` | `publisher_burst` |
-| At least 20 requests with >5% flagged by prior detectors in 600s | `publisher_id` | `0.3` | `publisher_suspicious_rate` |
-| At least 30 requests with >10% bad or empty user-agents in 600s | `publisher_id` | `0.3` | `publisher_bad_ua_rate` |
-| Negative prompt language pattern | request | `0.2` | `negative_prompt` |
-| Automated or suspicious user-agent pattern | request | `0.2` | `bad_user_agent` |
-| ASN is in the local high-risk ASN denylist | request | `0.2` | `asn_risk` |
-| Non-English language is unusual for request country | request | `0.1` | `language_mismatch_country` |
+#### Publisher-scoped
 
-Stateless rules should be added to `flink_service/rules.py`. User/IP scoped
-stateful rules should be added to `flink_service/user_detector.py`. Session
-scoped stateful rules should be added to `flink_service/session_detector.py`.
-Publisher scoped stateful rules should be added to
-`flink_service/publisher_detector.py`.
+| Rule | Score | Reason |
+| --- | --- | --- |
+| >200 requests in 300s | 0.5 | `publisher_burst` |
+| ≥20 reqs with ≥6:1 req:IP ratio in 300s | 0.45 | `publisher_burst_volume` |
+| ≥30 reqs with >10% flagged in 600s | 0.25 | `publisher_suspicious_rate` |
+| ≥30 reqs with >10% bad UA in 600s | 0.3 | `publisher_bad_ua_rate` |
+| BOTH new_ip AND new_session AND ratio>0.80 in 1800s | 0.20 | `publisher_dispersed_farm` |
+| Same prompt≥2 across sessions in 600s | 0.25 | `publisher_prompt_replay` |
+| ≥5 different countries in 600s | 0.25 | `publisher_geo_diversity` |
 
-## Deleted From Flink
+#### Stateless
 
-The old Flink fraud internals were removed:
+| Rule | Score | Reason |
+| --- | --- | --- |
+| Negative prompt pattern | 0.15 | `negative_prompt` |
+| Bot/crawler user-agent | 0.3 | `bad_user_agent` |
+| ASN in high-risk list | 0.2 | `asn_risk` |
+| Language-country both directions mismatch | 0.35 | `geo_language_mismatch` |
 
-| Deleted file | Reason |
-| --- | --- |
-| `flink_service/detector.py` | Large hard-to-follow stateful detector |
-| `flink_service/publisher_profiler.py` | Extra profiling stage not needed for starter |
-| `flink_service/session_analytics.py` | Extra session metrics stage not needed for starter |
-| `flink_service/prompt_features.py` | Only used by deleted detector/session code |
-| `flink_service/state_utils.py` | Only used by deleted stateful Flink internals |
-| `flink_service/verdicts.py` | Old verdict builders replaced by shared enriched events |
+## Pipeline Run 3 Results (2026-07-08)
+
+| Metric | Before (Run 2) | After (Run 3) | Target |
+|--------|---------------|--------------|--------|
+| TPR | 20.5% | **59.4%** | 70% |
+| FP | 1,229 | **5,421** | <1,000 |
+| Fraud→SUS | 2,029 | **53** | ~⅔ of missed |
+| Clean→SUS | 8,161 | **1,924** | <8,000 ✓ |
+
+Hard ceiling: max achievable TPR is **65.3%** (FRAUD=0.35, FP=7,495). Remaining 14% of fraud has score=0 (no rule fires). Full details in `results/pipeline_run_3.md`.
 
 ## Missing
 
-| Missing piece | Why it matters |
+| Piece | Why it matters |
 | --- | --- |
-| More Flink fraud rules | Current rules are still intentionally small. Add rules one by one. |
-| Clean event contract across all stages | Needed so Flink, RFC scoring, moderation, exporter, and Spark agree on payload shapes. |
-| Production-grade moderation failure handling | Needed for retries, dead-letter behavior, provider errors, and consistent blocked events. |
-| Real ad injection stage | Needed for the final approved-request path. |
-| Full orchestration | Needed to run Kafka, requests sender, Flink, scoring, moderation, ad injection, exporter, and Spark together. |
-| Automated tests | No configured test suite exists yet. Current validation is manual/script-based. |
+| RFC scoring on SUS events | Needed to catch the 53 fraud events in SUS and clear the 1,924 clean events. Currently 53:1,924 ratio makes this tough. |
+| Production moderation | Retries, dead-letter, provider errors, consistent blocked events. |
+| Real ad injection | Final approved-request path. |
+| Full orchestration | Run all stages together. |
+| Automated tests | Current validation is manual/script-based. |
 
-## Next Flink Steps
+## Next Steps
 
-1. Add geo travel scoring.
-2. Replace or extend the local high-risk ASN denylist with Spark-derived ASN risk scores.
-3. Add prompt repetition or similarity rules across sessions.
+1. Train RFC model on exported pipeline data and measure its accuracy on SUS events.
+2. Improve Flink precision to push clean traffic out of SUS before RFC.
+3. Add rules for remaining invisible attacks (slow_promp_replay: 62.6% score=0, ua_rotation: 33.1% score=0).

@@ -27,6 +27,9 @@ from flink_service.constants import (
     SESSION_IP_CHURN_MIN_UNIQUE_IPS,
     SESSION_IP_CHURN_SCORE,
     SESSION_IP_CHURN_WINDOW_SECONDS,
+    SESSION_UA_CHURN_MIN_UNIQUE_UAS,
+    SESSION_UA_CHURN_SCORE,
+    SESSION_UA_CHURN_WINDOW_SECONDS,
 )
 from flink_service.events import (
     extract_raw_request_timestamp_ms,
@@ -132,6 +135,10 @@ class SessionFraudDetector(KeyedProcessFunction):
             "recent_session_prompts", Types.STRING()
         )
         self.recent_prompts = runtime_context.get_list_state(prompt_descriptor)
+        ua_descriptor = ListStateDescriptor(
+            "recent_session_user_agents", Types.STRING()
+        )
+        self.recent_user_agents = runtime_context.get_list_state(ua_descriptor)
 
     def process_element(self, value: str, ctx: "KeyedProcessFunction.Context"):
         event = load_event(value)
@@ -206,6 +213,18 @@ class SessionFraudDetector(KeyedProcessFunction):
                 if len(unique_asns) >= SESSION_ASN_CHURN_MIN_UNIQUE_ASNS:
                     score += SESSION_ASN_CHURN_SCORE
                     reasons.append("session_asn_churn")
+
+            user_agent = request.request_context.user_agent.strip()
+            if user_agent:
+                unique_uas = _recent_values(
+                    self.recent_user_agents,
+                    event_timestamp_ms,
+                    SESSION_UA_CHURN_WINDOW_SECONDS,
+                    user_agent,
+                )
+                if len(unique_uas) >= SESSION_UA_CHURN_MIN_UNIQUE_UAS:
+                    score += SESSION_UA_CHURN_SCORE
+                    reasons.append("session_ua_churn")
 
             prompt = _normalise_prompt(request.prompt)
             if prompt:

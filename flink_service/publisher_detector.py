@@ -18,8 +18,14 @@ from flink_service.constants import (
     PUBLISHER_COMPOUND_FARM_SCORE,
     PUBLISHER_DISPERSION_WINDOW_SECONDS,
     PUBLISHER_FLAGGED_EXCLUDE_REASONS,
+    PUBLISHER_GEO_DIVERSITY_MIN_COUNTRIES,
+    PUBLISHER_GEO_DIVERSITY_SCORE,
+    PUBLISHER_GEO_DIVERSITY_WINDOW_SECONDS,
     PUBLISHER_NEW_IP_SCORE,
     PUBLISHER_NEW_SESSION_SCORE,
+    PUBLISHER_PROMPT_REPLAY_MIN_COUNT,
+    PUBLISHER_PROMPT_REPLAY_SCORE,
+    PUBLISHER_PROMPT_REPLAY_WINDOW_SECONDS,
     PUBLISHER_RATE_WINDOW_SECONDS,
     PUBLISHER_SUSPICIOUS_RATE_MIN_REQUESTS,
     PUBLISHER_SUSPICIOUS_RATE_SCORE,
@@ -140,6 +146,14 @@ class PublisherFraudDetector(KeyedProcessFunction):
             "publisher_dispersion_timestamps", Types.LONG()
         )
         self.dispersion_timestamps = runtime_context.get_list_state(disp_ts_descriptor)
+        prompt_descriptor = ListStateDescriptor(
+            "publisher_seen_prompts", Types.STRING()
+        )
+        self.publisher_prompts = runtime_context.get_list_state(prompt_descriptor)
+        country_descriptor = ListStateDescriptor(
+            "publisher_seen_countries", Types.STRING()
+        )
+        self.publisher_countries = runtime_context.get_list_state(country_descriptor)
 
     def process_element(self, value: str, ctx: "KeyedProcessFunction.Context"):
         event = load_event(value)
@@ -266,5 +280,25 @@ class PublisherFraudDetector(KeyedProcessFunction):
         if len(recent_timestamps) >= 20 and unique_ips_burst > 0 and len(recent_timestamps) / unique_ips_burst >= 6:
             score += PUBLISHER_BURST_VOLUME_SCORE
             reasons.append("publisher_burst_volume")
+
+        prompt = request.prompt.strip()
+        if prompt:
+            recent_prompts = _maintain_tracked_values(
+                self.publisher_prompts, event_timestamp_ms,
+                PUBLISHER_PROMPT_REPLAY_WINDOW_SECONDS, prompt
+            )
+            if len(recent_prompts) >= PUBLISHER_PROMPT_REPLAY_MIN_COUNT:
+                score += PUBLISHER_PROMPT_REPLAY_SCORE
+                reasons.append("publisher_prompt_replay")
+
+        country = request.optional_context.country.strip().upper()
+        if country:
+            recent_countries = _maintain_tracked_values(
+                self.publisher_countries, event_timestamp_ms,
+                PUBLISHER_GEO_DIVERSITY_WINDOW_SECONDS, country
+            )
+            if len(recent_countries) >= PUBLISHER_GEO_DIVERSITY_MIN_COUNTRIES:
+                score += PUBLISHER_GEO_DIVERSITY_SCORE
+                reasons.append("publisher_geo_diversity")
 
         yield json.dumps(DetectionResult(request, score, reasons).to_dict())

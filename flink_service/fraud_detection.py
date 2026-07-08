@@ -11,6 +11,7 @@ from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.watermark_strategy import TimestampAssigner, WatermarkStrategy
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import (
+    DeliveryGuarantee,
     KafkaOffsetsInitializer,
     KafkaRecordSerializationSchema,
     KafkaSink,
@@ -116,8 +117,9 @@ def format_log_line(routed_value: str) -> str:
     if event.get("source") == "flink" and event.get("verdict") == "fraud":
         req_id = str(event.get("req_id", "unknown"))
         reasons = event.get("reasons", [])
+        score = float(event.get("score", 0.0) or 0.0)
         return (
-            f"[flink-fraud] FRAUD req_id={req_id} "
+            f"[flink-fraud] FRAUD req_id={req_id} score={score:.3f} "
             f"reasons={json.dumps(reasons)} -> {REQUESTS_FRAUD_TOPIC}"
         )
 
@@ -127,6 +129,7 @@ def format_log_line(routed_value: str) -> str:
 
     verdict = str(fraud.get("verdict", "clean")).lower()
     score = float(fraud.get("score", 0.0) or 0.0)
+    reasons = fraud.get("reasons", [])
     req_id = str(event.get("req_id", "unknown"))
 
     target_topic = REQUESTS_CLEAN_TOPIC
@@ -136,8 +139,8 @@ def format_log_line(routed_value: str) -> str:
         target_topic = REQUESTS_FRAUD_TOPIC
 
     return (
-        f"[flink-fraud] {verdict.upper()} req_id={req_id} "
-        f"score={score} -> {target_topic}"
+        f"[flink-fraud] {verdict.upper()} req_id={req_id} score={score:.3f} "
+        f"reasons={json.dumps(reasons)} -> {target_topic}"
     )
 
 
@@ -151,6 +154,7 @@ def build_kafka_sink(topic: str) -> KafkaSink:
             .set_value_serialization_schema(SimpleStringSchema())
             .build()
         )
+        .set_delivery_guarantee(DeliveryGuarantee.NONE)
         .build()
     )
 
