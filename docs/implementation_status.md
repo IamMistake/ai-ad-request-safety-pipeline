@@ -53,7 +53,7 @@ Labeled rows keep fraud metadata outside the raw Kafka payload. The requests sen
 4. Key by `session_id` → apply `SessionFraudDetector`.
 5. Key by `publisher_id` → apply `PublisherFraudDetector`.
 6. Apply stateless rules from `flink_service/rules.py`.
-7. Route based on total score: `<0.45` → `requests.clean`, `0.45-0.55` → `requests.sus`, `≥0.55` → `requests.fraud`.
+7. Route based on total score: `<0.35` → `requests.clean`, `0.35-0.45` → `requests.sus`, `≥0.45` → `requests.fraud`.
 
 ### Active Flink Rules
 
@@ -63,11 +63,11 @@ Labeled rows keep fraud metadata outside the raw Kafka payload. The requests sen
 | --- | --- | --- |
 | >12 requests in 60s | 0.4 | `session_burst` |
 | ≥2 unique IPs in 120s | 0.4 | `session_ip_churn` |
-| ≥2 unique UAs in 120s | 0.30 | `session_ua_churn` |
+| ≥2 unique UAs in 120s | 0.35 | `session_ua_churn` |
 | >2 countries in 120s | 0.5 | `session_country_hop` |
 | ≥2 unique ASNs in 120s | 0.4 | `session_asn_churn` |
-| ≥90% similar prompt in 300s | 0.4 | `prompt_replay` |
-| Last 4 intervals ≤250ms drift | 0.40 | `regular_cadence` |
+| ≥90% similar prompt in 300s | 0.45 | `prompt_replay` |
+| Last 4 intervals ≤250ms drift | 0.45 | `regular_cadence` |
 
 #### Publisher-scoped
 
@@ -78,8 +78,10 @@ Labeled rows keep fraud metadata outside the raw Kafka payload. The requests sen
 | ≥30 reqs with >10% flagged in 600s | 0.25 | `publisher_suspicious_rate` |
 | ≥30 reqs with >10% bad UA in 600s | 0.3 | `publisher_bad_ua_rate` |
 | BOTH new_ip AND new_session AND ratio>0.80 in 1800s | 0.20 | `publisher_dispersed_farm` |
-| Same prompt≥2 across sessions in 600s | 0.25 | `publisher_prompt_replay` |
+| Same prompt≥2 across sessions in 600s | 0.35 | `publisher_prompt_replay` |
 | ≥5 different countries in 600s | 0.25 | `publisher_geo_diversity` |
+| Cyclic UA pattern (≥3 unique UAs, ≥10 reqs) in 600s | 0.35 | `publisher_ua_rotation` |
+| Same prompt≥3 across sessions in 1800s | 0.35 | `publisher_slow_prompt_replay` |
 
 #### Stateless
 
@@ -88,7 +90,7 @@ Labeled rows keep fraud metadata outside the raw Kafka payload. The requests sen
 | Negative prompt pattern | 0.15 | `negative_prompt` |
 | Bot/crawler user-agent | 0.3 | `bad_user_agent` |
 | ASN in high-risk list | 0.2 | `asn_risk` |
-| Language-country both directions mismatch | 0.35 | `geo_language_mismatch` |
+| Language-country both directions mismatch | 0.45 | `geo_language_mismatch` |
 
 ## Pipeline Run 3 Results (2026-07-08)
 

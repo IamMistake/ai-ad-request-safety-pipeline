@@ -27,9 +27,16 @@ from flink_service.constants import (
     PUBLISHER_PROMPT_REPLAY_SCORE,
     PUBLISHER_PROMPT_REPLAY_WINDOW_SECONDS,
     PUBLISHER_RATE_WINDOW_SECONDS,
+    PUBLISHER_SLOW_PROMPT_REPLAY_MIN_COUNT,
+    PUBLISHER_SLOW_PROMPT_REPLAY_SCORE,
+    PUBLISHER_SLOW_PROMPT_REPLAY_WINDOW_SECONDS,
     PUBLISHER_SUSPICIOUS_RATE_MIN_REQUESTS,
     PUBLISHER_SUSPICIOUS_RATE_SCORE,
     PUBLISHER_SUSPICIOUS_RATE_THRESHOLD,
+    PUBLISHER_UA_ROTATION_MIN_REQUESTS,
+    PUBLISHER_UA_ROTATION_MIN_UNIQUE_UAS,
+    PUBLISHER_UA_ROTATION_SCORE,
+    PUBLISHER_UA_ROTATION_WINDOW_SECONDS,
 )
 from flink_service.events import (
     extract_raw_request_timestamp_ms,
@@ -124,6 +131,61 @@ def _decode_value(value: str) -> str:
         return value
 
 
+def _detect_ua_rotation(recent_uas: list[str]) -> bool:
+    if len(recent_uas) < PUBLISHER_UA_ROTATION_MIN_REQUESTS:
+        return False
+
+    unique_uas = set(recent_uas)
+    if len(unique_uas) < PUBLISHER_UA_ROTATION_MIN_UNIQUE_UAS:
+        return False
+
+    ua_indices: dict[str, list[int]] = {}
+    for idx, ua in enumerate(recent_uas):
+        ua_indices.setdefault(ua, []).append(idx)
+
+    if len(ua_indices) < PUBLISHER_UA_ROTATION_MIN_UNIQUE_UAS:
+        return False
+
+    first_positions = sorted(ua_indices[ua][0] for ua in unique_uas)
+    cycle_length = first_positions[-1] - first_positions[0] + 1
+    if cycle_length < 2:
+        return False
+
+    expected_cycle = recent_uas[first_positions[0]:first_positions[-1] + 1]
+    if len(expected_cycle) < 3:
+        return False
+
+    matches = 0
+    total_checked = 0
+    for start in range(0, len(recent_uas) - len(expected_cycle) + 1, len(expected_cycle)):
+        segment = recent_uas[start:start + len(expected_cycle)]
+        total_checked += 1
+        if segment == expected_cycle:
+            matches += 1
+
+    return total_checked >= 2 and matches == total_checked
+
+
+def _recent_ua_sequence(state, timestamp_ms: int, window_seconds: int, new_ua: str) -> list[str]:
+    window_start_ms = timestamp_ms - (window_seconds * 1000)
+    uas: list[str] = []
+
+    for entry in state.get() or []:
+        try:
+            parts = entry.split("|", 1)
+            ts = int(parts[0])
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if ts >= window_start_ms:
+            decoded = _decode_value(parts[1]) if len(parts) > 1 else ""
+            uas.append(decoded)
+
+    encoded_new = _encode_value(new_ua)
+    uas.append(new_ua)
+    state.update([f"{timestamp_ms}|{encoded_new}" for _, _ in enumerate(uas)])
+    return uas
+
+
 class PublisherFraudDetector(KeyedProcessFunction):
     def open(self, runtime_context: RuntimeContext) -> None:
         ts_descriptor = ListStateDescriptor(
@@ -154,6 +216,14 @@ class PublisherFraudDetector(KeyedProcessFunction):
             "publisher_seen_countries", Types.STRING()
         )
         self.publisher_countries = runtime_context.get_list_state(country_descriptor)
+        ua_seq_descriptor = ListStateDescriptor(
+            "publisher_ua_sequence", Types.STRING()
+        )
+        self.publisher_ua_sequence = runtime_context.get_list_state(ua_seq_descriptor)
+        slow_prompt_descriptor = ListStateDescriptor(
+            "publisher_slow_prompts", Types.STRING()
+        )
+        self.publisher_slow_prompts = runtime_context.get_list_state(slow_prompt_descriptor)
 
     def process_element(self, value: str, ctx: "KeyedProcessFunction.Context"):
         event = load_event(value)
@@ -300,5 +370,24 @@ class PublisherFraudDetector(KeyedProcessFunction):
             if len(recent_countries) >= PUBLISHER_GEO_DIVERSITY_MIN_COUNTRIES:
                 score += PUBLISHER_GEO_DIVERSITY_SCORE
                 reasons.append("publisher_geo_diversity")
+
+        user_agent = request.request_context.user_agent.strip()
+        if user_agent:
+            recent_uas = _recent_ua_sequence(
+                self.publisher_ua_sequence, event_timestamp_ms,
+                PUBLISHER_UA_ROTATION_WINDOW_SECONDS, user_agent
+            )
+            if _detect_ua_rotation(recent_uas):
+                score += PUBLISHER_UA_ROTATION_SCORE
+                reasons.append("publisher_ua_rotation")
+
+        if prompt:
+            recent_slow_prompts = _maintain_tracked_values(
+                self.publisher_slow_prompts, event_timestamp_ms,
+                PUBLISHER_SLOW_PROMPT_REPLAY_WINDOW_SECONDS, prompt
+            )
+            if len(recent_slow_prompts) >= PUBLISHER_SLOW_PROMPT_REPLAY_MIN_COUNT:
+                score += PUBLISHER_SLOW_PROMPT_REPLAY_SCORE
+                reasons.append("publisher_slow_prompt_replay")
 
         yield json.dumps(DetectionResult(request, score, reasons).to_dict())
