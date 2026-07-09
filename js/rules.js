@@ -7,26 +7,33 @@
 
   var rulesData = {
     stateless: [
-      { name: 'Negative Prompt', reason: 'negative_prompt', score: 0.2 },
-      { name: 'Bad User Agent', reason: 'bad_user_agent', score: 0.2 },
-      { name: 'ASN Risk', reason: 'asn_risk', score: 0.2 },
-      { name: 'Language/Country Mismatch', reason: 'language_mismatch_country', score: 0.1 }
+      { name: 'Negative Prompt', reason: 'negative_prompt', score: 0.15 },
+      { name: 'Bad User Agent', reason: 'bad_user_agent', score: 0.30 },
+      { name: 'ASN Risk', reason: 'asn_risk', score: 0.20 },
+      { name: 'Geo-Language Mismatch', reason: 'geo_language_mismatch', score: 0.45 }
     ],
     user: [
-      { name: 'IP Burst', reason: 'ip_burst', score: 0.6 }
+      { name: 'IP Burst', reason: 'ip_burst', score: 0.35 }
     ],
     session: [
-      { name: 'Session Burst', reason: 'session_burst', score: 0.4 },
-      { name: 'Session IP Churn', reason: 'session_ip_churn', score: 0.4 },
-      { name: 'Session Country Hop', reason: 'session_country_hop', score: 0.5 },
-      { name: 'Session ASN Churn', reason: 'session_asn_churn', score: 0.4 },
-      { name: 'Prompt Replay', reason: 'prompt_replay', score: 0.4 },
-      { name: 'Regular Cadence', reason: 'regular_cadence', score: 0.3 }
+      { name: 'Session Burst', reason: 'session_burst', score: 0.40 },
+      { name: 'Session IP Churn', reason: 'session_ip_churn', score: 0.40 },
+      { name: 'Session UA Churn', reason: 'session_ua_churn', score: 0.35 },
+      { name: 'Session Country Hop', reason: 'session_country_hop', score: 0.50 },
+      { name: 'Session ASN Churn', reason: 'session_asn_churn', score: 0.40 },
+      { name: 'Prompt Replay', reason: 'prompt_replay', score: 0.45 },
+      { name: 'Regular Cadence', reason: 'regular_cadence', score: 0.25 }
     ],
     publisher: [
-      { name: 'Publisher Burst', reason: 'publisher_burst', score: 0.3 },
-      { name: 'Publisher Suspicious Rate', reason: 'publisher_suspicious_rate', score: 0.3 },
-      { name: 'Publisher Bad UA Rate', reason: 'publisher_bad_ua_rate', score: 0.3 }
+      { name: 'Publisher Burst', reason: 'publisher_burst', score: 0.50 },
+      { name: 'Publisher Burst Volume', reason: 'publisher_burst_volume', score: 0.35 },
+      { name: 'Publisher Suspicious Rate', reason: 'publisher_suspicious_rate', score: 0.25 },
+      { name: 'Publisher Bad UA Rate', reason: 'publisher_bad_ua_rate', score: 0.30 },
+      { name: 'Publisher Dispersed Farm', reason: 'publisher_dispersed_farm', score: 0.20 },
+      { name: 'Publisher Prompt Replay', reason: 'publisher_prompt_replay', score: 0.10 },
+      { name: 'Publisher Geo Diversity', reason: 'publisher_geo_diversity', score: 0.25 },
+      { name: 'Publisher UA Rotation', reason: 'publisher_ua_rotation', score: 0.20 },
+      { name: 'Publisher Slow Prompt Replay', reason: 'publisher_slow_prompt_replay', score: 0.10 }
     ]
   };
 
@@ -41,12 +48,12 @@
 
       rulesData[scope].forEach(function (rule) {
         var key = rule.reason;
-        activeRules[key] = true;
+        activeRules[key] = false;
 
         var toggle = document.createElement('div');
-        toggle.className = 'rule-toggle active';
+        toggle.className = 'rule-toggle';
         toggle.setAttribute('role', 'checkbox');
-        toggle.setAttribute('aria-checked', 'true');
+        toggle.setAttribute('aria-checked', 'false');
         toggle.setAttribute('tabindex', '0');
         toggle.dataset.key = key;
         toggle.dataset.score = rule.score;

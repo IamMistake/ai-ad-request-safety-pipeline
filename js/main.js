@@ -58,9 +58,9 @@
   function observeFadeIn() {
     var elements = document.querySelectorAll(
       '.pillars, .flow-steps, .pipeline-container, .rules-explorer, ' +
-      '.results-grid, .quickstart-steps, .spark-grid, ' +
-      '.data-sources, .fraud-table-wrap, .abstract-box, .metrics-strip, ' +
-      '.flink-diagram, .spark-diagram, .moderation-diagram, .moderation-flow, ' +
+      '.results-grid, .quickstart-steps, .spark-grid, .spark-flow-text, ' +
+      '.data-sources, .abstract-box, .metrics-strip, ' +
+      '.flink-diagram, .moderation-diagram, .moderation-flow, ' +
       '.moderation-tfidf'
     );
 

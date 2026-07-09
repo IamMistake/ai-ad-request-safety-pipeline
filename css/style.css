@@ -966,61 +966,6 @@ section[id] {
   border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
-/* ====== FRAUD TABLE ====== */
-.fraud-table-wrap {
-  overflow-x: auto;
-  border-radius: 18px;
-  border: 1px solid var(--rm-line);
-  background: #fff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
-  margin-top: 2rem;
-}
-
-.rm-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.rm-table thead {
-  background: linear-gradient(180deg, #eef2ff, #ede9fe);
-}
-
-.rm-table th {
-  padding: 0.85rem 0.9rem;
-  text-align: left;
-  font-weight: 700;
-  color: #312e81;
-  border-bottom: 2px solid #ddd6fe;
-  letter-spacing: 0.02em;
-}
-
-.rm-table td {
-  padding: 0.65rem 0.9rem;
-  color: #1f2937;
-  border-bottom: 1px solid var(--rm-line);
-}
-
-.rm-table tr:last-child td {
-  border-bottom: none;
-}
-
-.rm-table tbody tr:hover {
-  background: #f8fafc;
-}
-
-.rm-table .group-head td {
-  background: #f1f5f9;
-  color: var(--rm-sub);
-  font-weight: 700;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  text-align: center;
-  padding: 0.45rem;
-  border-bottom: 1px solid var(--rm-line);
-}
-
 /* ====== FLINK DIAGRAM ====== */
 .flink-diagram {
   margin: 1.5rem 0;
@@ -1290,6 +1235,28 @@ section[id] {
   margin: 1.5rem 0;
 }
 
+.spark-flow-text {
+  background: #fff;
+  border: 1px solid var(--rm-line);
+  border-radius: 18px;
+  padding: 1.5rem 2rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  line-height: 1.8;
+}
+.spark-flow-text p {
+  margin-bottom: 0.75rem;
+}
+.spark-flow-text p:last-child {
+  margin-bottom: 0;
+}
+.spark-flow-text code {
+  background: #f1f5f9;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
 .spark-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1507,12 +1474,20 @@ section[id] {
 }
 .qs-card pre {
   margin: 0;
+  padding: 1rem !important;
   border-radius: 8px !important;
   font-size: 0.7rem !important;
   line-height: 1.45 !important;
+  overflow-x: auto;
+  max-width: 100%;
+  text-align: left;
 }
 .qs-card code {
+  display: block;
   font-size: 0.7rem;
+  min-width: max-content;
+  white-space: pre;
+  text-align: left;
 }
 
 /* ====== STATUS GRID ====== */
