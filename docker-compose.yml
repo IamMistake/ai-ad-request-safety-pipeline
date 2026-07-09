@@ -47,6 +47,9 @@ services:
       # FIX: Disable JMX to prevent cgroup error
       KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote=false"
 
+      # Auto-create topics for dev convenience
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
   # --------------------------------------------------
   # KAFKA UI
   # --------------------------------------------------

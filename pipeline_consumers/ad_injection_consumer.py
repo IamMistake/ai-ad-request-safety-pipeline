@@ -1,23 +1,26 @@
-import sys
-from pathlib import Path
+import json
 
-CURRENT_DIR = Path(__file__).resolve().parent
-if str(CURRENT_DIR) not in sys.path:
-    sys.path.append(str(CURRENT_DIR))
+from kafka import KafkaConsumer
 
-try:
-    from .common import run_consumer
-except ImportError:
-    from common import run_consumer
+from constants import AD_INJECTION_TOPIC, KAFKA_API_VERSION, KAFKA_BOOTSTRAP
 
 
 def main() -> None:
-    run_consumer(
-        consumer_name="ad-injection",
+    consumer = KafkaConsumer(
+        AD_INJECTION_TOPIC,
+        bootstrap_servers=KAFKA_BOOTSTRAP,
+        api_version=KAFKA_API_VERSION,
+        auto_offset_reset="latest",
+        enable_auto_commit=True,
         group_id="ad-injection-consumer",
-        work_duration_seconds=4.0,
-        completion_message="finished",
+        value_deserializer=lambda value: json.loads(value.decode("utf-8")),
     )
+
+    print(f"ad-injection consumer started: listening to {AD_INJECTION_TOPIC}")
+
+    for msg in consumer:
+        req_id = msg.value.get("req_id")
+        print(f"[ad-injection] received req_id={req_id}")
 
 
 if __name__ == "__main__":

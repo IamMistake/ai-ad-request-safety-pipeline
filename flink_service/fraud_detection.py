@@ -77,7 +77,6 @@ def route_request(detection_result_raw: str) -> str:
         )
 
     result = DetectionResult.from_dict(detection_result)
-    print(f"[DEBUG] raw_request.req_id='{result.raw_request.req_id}'", flush=True)
     stateless_score, stateless_reasons = apply_rules(result.raw_request)
     score = round(
         max(0.0, min(float(stateless_score) + float(result.stateful_score), 1.0)),

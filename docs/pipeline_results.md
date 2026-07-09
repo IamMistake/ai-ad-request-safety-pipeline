@@ -2,6 +2,30 @@
 
 Chronological summary of all pipeline runs and their outcomes.
 
+## Run 7 — Full 70k Pipeline Test (2026-07-08)
+
+**Config**: FRAUD=0.70, SUS=0.30 | **Dataset**: 70,000 rows (6,914 fraud, 63,086 clean)
+**Services**: Flink + RFC scoring + Moderation gate (bad-term matching) + Ad injection
+
+| Topic | Events |
+|------:|------:|
+| `requests.raw` | 70,000 |
+| `requests.clean` | 63,105 |
+| `requests.sus` | 8,497 |
+| `requests.fraud` | 7,008 |
+| `ad.injection` | 62,992 |
+
+| Metric | Value | Target | Status |
+|--------|------:|------:|:------:|
+| TPR | **77.7%** | ≥70% | ✓ |
+| FP | **1,626** | <1,000 | ✗ |
+| FPR | 2.58% | — | — |
+| Precision | 76.8% | — | — |
+
+What changed: First end-to-end run using the new `moderation_service/` with bad-term matching gate. Sender replayed all 70k `train.jsonl` rows. Moderation flagged 113 prompts (63,105 clean − 62,992 ad.injection) via the reference bad-terms gate. FP overshoot (1,626 vs 1,000 target) carried by earlier runs too — behavioral rules accumulate false positives on clean traffic at scale.
+
+---
+
 ## Run 6 — Full Kafka Streaming Validation (2026-07-08)
 
 **Config**: FRAUD=0.70, SUS=0.30 | **Dataset**: 27,656 rows (6,914 fraud, 20,742 clean)
