@@ -33,7 +33,8 @@ Requests Sender
 | Historical exporter | Implemented prototype; consumes Flink output topics, joins offline labels by `req_id`, preserves full `feature_event` schema | `spark_service/historical_exporter.py` |
 | RFC scoring service | Implemented Kafka scorer; supports `--from-beginning`, `--max-messages`, and `--idle-seconds` for repeatable runs | `scoring_service/rfc_scoring_service.py` |
 | Moderation consumer | TF-IDF gate with mock threshold mode and optional OpenAI mode; 2% audit sampling; OpenAI error-allow policy | `moderation_service/moderation_consumer.py`, `moderation_service/tfidf_gate.py` |
-| Ad injection consumer | Placeholder only; consumes approved events and simulates work | `pipeline_consumers/ad_injection_consumer.py` |
+| Ad injection consumer | Lightweight consumer; prints req_id for each approved event | `pipeline_consumers/ad_injection_consumer.py` |
+| Labeled run evaluation | Evaluates pipeline output against ground-truth labels from a `--dataset` JSONL file; reports TPR/FPR | `scripts/evaluate_labeled_run.py` |
 | Smoke scripts | Present for manual flow checks and RFC scoring unit checks | `scripts/test_full_pipeline.sh`, `scripts/test_fraud_block_flow.sh`, `scripts/test_moderation_block_flow.sh`, `scripts/smoke_rfc_scoring.py` |
 
 ## Current Flink Behavior
@@ -71,8 +72,8 @@ all 4,137 suspicious Kafka messages and routed them to final clean/fraud topics.
 
 | Piece | Why it matters |
 | --- | --- |
-| Production moderation / Phase 7 | Add TF-IDF gate, audit sampling, OpenAI error policy, and consistent blocked unsafe events. |
-| Real ad finding / Phase 8 | Replace placeholder consumer with visible catalog matching. |
+| Production moderation / Phase 7 | Strengthen TF-IDF gate, add audit sampling, OpenAI error policy, and consistent blocked unsafe events. |
+| Real ad finding / Phase 8 | Add catalog matching to ad injection consumer (currently just prints req_id). |
 | Orchestration | One repeatable command/script for Kafka reset, Flink, sender, exporter, Spark, RFC, and metrics. |
 | Automated regression tests | Protect Run 5 thresholds/model behavior from accidental drift. |
 | Weak attack coverage | `slow_promp_replay` and `ua_rotation` still need stronger signals. |

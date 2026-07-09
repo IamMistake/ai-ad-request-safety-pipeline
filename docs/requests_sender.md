@@ -11,7 +11,7 @@ depending on production traffic.
 | File | Role |
 | --- | --- |
 | `scripts/build_labeled_requests_dataset.py` | Reads local WildChat `.parquet` or `.jsonl` files and writes labeled request JSONL splits |
-| `scripts/fraud_injectors/` | Placeholder interface for future attack scripts that append labeled fraud rows |
+| `scripts/fraud_injectors/` | Attack scripts that append labeled fraud rows to the clean dataset base |
 | `kafka/producers/requests_sender.py` | Replays one labeled JSONL split and publishes only each row's `event` object |
 | `kafka/producers/simulator_constants.py` | Kafka settings, default replay rate, and default labeled dataset path |
 

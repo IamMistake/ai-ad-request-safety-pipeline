@@ -109,16 +109,15 @@ RULES = [
 
 Full latest streaming details in `docs/pipeline_results.md`.
 
-| Metric | Run 4 (before optimization) | Run 6 (full Kafka Flink + RFC) | Target |
-|--------|-----------------------------|---------------------|--------|
-| TPR | 68.4% | **77.73%** | ≥70% |
-| FP | 11,356 | **157** | <1,000 |
-| RFC SUS F1 | 78.6% | **99.7%** | — |
-| Flink Fraud→SUS | 138 | **1,837** | — |
+| Metric | Run 7 (full pipeline + moderation) | Target |
+|--------|------------------------------------|--------|
+| TPR | **77.7%** | ≥70% |
+| FP | **1,626** | <1,000 |
+| Precision | 76.8% | — |
 
-Run 6 validated the real Kafka path: 27,656 raw events produced 19,839 clean,
-4,137 suspicious, and 3,680 fraud Flink output events, then RFC consumed all
-4,137 suspicious events from Kafka.
+Run 7 was the first end-to-end pipeline run including moderation gate. 70,000 raw
+events produced 63,105 clean, 8,497 suspicious, 7,008 fraud Flink output events,
+and 62,992 reached ad.injection after moderation.
 
 ## Adding New Rules
 

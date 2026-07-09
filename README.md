@@ -61,7 +61,7 @@ flowchart LR
 | Flink fraud detection | Scores and routes requests as clean, suspicious, or fraud | `flink_service/fraud_detection.py` |
 | RFC scoring | Model-backed scoring for suspicious requests | `scoring_service/` |
 | Moderation | Checks fraud-clean prompts before monetization | `moderation_service/moderation_consumer.py` |
-| Ad injection | Consumes fully approved requests | `pipeline_consumers/ad_injection_consumer.py` |
+| Ad injection | Consumes and prints approved request IDs | `pipeline_consumers/ad_injection_consumer.py` |
 | Historical export | Exports Kafka history for batch processing | `spark_service/historical_exporter.py` |
 | Spark training | Produces risk rollups and a local fraud model | `spark_service/spark_training.py` |
 

@@ -41,4 +41,4 @@ Immediate goals:
 
 1. Keep the default mock mode for reliable local tests.
 2. Support `MODERATION_PROVIDER=openai` through `.env`.
-3. Later add TF-IDF/cosine-similarity gating before selective OpenAI calls.
+3. TF-IDF/cosine-similarity gating implemented in `moderation_service/tfidf_gate.py` for selective OpenAI calls.

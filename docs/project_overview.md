@@ -59,7 +59,7 @@ flowchart LR
 | `flink_service/fraud_detection.py` | Real-time fraud detection with session + publisher detectors |
 | `scoring_service/rfc_scoring_service.py` | Kafka-based RFC model scorer for suspicious events |
 | `moderation_service/moderation_consumer.py` | Moderation consumer with TF-IDF gate and `.env` configuration |
-| `pipeline_consumers/ad_injection_consumer.py` | Placeholder ad-injection consumer |
+| `pipeline_consumers/ad_injection_consumer.py` | Lightweight ad-injection consumer |
 | `spark_service/spark_training.py` | Offline RFC model training from exported Flink logs |
 | `spark_service/historical_exporter.py` | Exports Flink output topics joined with offline labels |
 
@@ -70,13 +70,12 @@ flowchart LR
 | `docs/current_architecture.md` | Architecture, event flow, topic boundaries, and component responsibilities |
 | `docs/kafka_topics.md` | Topic contracts and streaming boundaries |
 | `docs/flink_processing.md` | Current Flink rule set and processing pipeline |
-| `docs/spark_analytics.md` | Spark placeholder until a new plan is written |
+| `docs/spark_analytics.md` | Historical export and RFC model training |
 | `docs/event_schemas.md` | Current JSON payloads across the pipeline |
 | `docs/requests_sender.md` | Labeled request replay strategy |
 | `docs/fraud_scripts.md` | How to append labeled fraud traffic |
 | `docs/moderation_service.md` | Moderation responsibilities and near-term plan |
 | `docs/implementation_status.md` | Current implementation state and pipeline run results |
-| `docs/new_architecture_plan/` | Phased plan for the new topic and service architecture |
 | `docs/pipeline_results.md` | Latest full Kafka streaming validation for Flink + RFC |
 
 ## Current Engineering Position

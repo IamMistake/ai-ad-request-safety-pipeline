@@ -83,7 +83,7 @@ sequenceDiagram
 | Flink Fraud | Real-time fraud detection with session and publisher rules | `flink_service/fraud_detection.py` |
 | RFC Scoring Service | Score suspicious requests with the offline-trained RandomForest model | `scoring_service/rfc_scoring_service.py` |
 | Moderation Service | TF-IDF gate, selective OpenAI moderation, route approved requests | `moderation_service/moderation_consumer.py` |
-| Ad Injection Consumer | Consume fully approved requests | `pipeline_consumers/ad_injection_consumer.py` |
+| Ad Injection Consumer | Consume and print approved request IDs | `pipeline_consumers/ad_injection_consumer.py` |
 | Historical Exporter | Export Flink output joined with offline labels for Spark training | `spark_service/historical_exporter.py` |
 | Spark Training | Train RandomForestClassifier from exported logs | `spark_service/spark_training.py` |
 
@@ -117,7 +117,7 @@ and historical aggregation.
 | RFC scoring service | Implemented Kafka scorer consuming `requests.sus`; supports repeatable `--from-beginning` smoke runs |
 | Moderation service | Prototype exists with `.env` configuration and OpenAI-ready provider support |
 | Spark training | Implemented: `historical_exporter.py` + `spark_training.py` writes RFC model artifacts |
-| Pipeline results | Latest full Kafka validation: Run 6 reached 77.73% TPR and 157 FP; see `docs/pipeline_results.md` |
+| Pipeline results | Latest full-pipeline run: Run 7 reached 77.7% TPR and 1,626 FP; see `docs/pipeline_results.md` |
 
 ## Future Agents Guidance
 

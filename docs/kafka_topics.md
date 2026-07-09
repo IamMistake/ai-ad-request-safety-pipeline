@@ -14,7 +14,7 @@
 
 ```mermaid
 flowchart LR
-    A[Simulator Output] --> B[requests.raw]
+    A[Requests Sender] --> B[requests.raw]
     B --> C[Flink Fraud Processor]
     C --> D[requests.sus]
     C --> E[requests.clean]
