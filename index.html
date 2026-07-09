@@ -518,80 +518,94 @@
           Flink + RFC scoring + Moderation gate.
         </p>
 
-        <div class="results-grid">
-          <div class="result-chart">
+        <div class="results-showcase">
+          <div class="result-chart-card">
+            <div class="result-card-head">
+              <span>Run 7 Flow</span>
+              <strong>70,000 events</strong>
+            </div>
             <figure>
-              <object type="image/svg+xml" data="assets/graphs/verdict-distribution.svg" class="chart-svg"
-                aria-label="Bar chart of verdict distribution."></object>
+              <img src="assets/diagrams/pipeline-results.png" class="chart-svg"
+                alt="Excalidraw chart of Run 7 pipeline results showing topic volumes and detection quality metrics."
+                loading="lazy">
             </figure>
           </div>
-          <div class="result-table-wrap">
-            <table class="rm-table">
-              <thead>
-                <tr>
-                  <th>Topic</th>
-                  <th>Events</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>requests.raw</code></td>
-                  <td><strong>70,000</strong></td>
-                </tr>
-                <tr>
-                  <td><code>requests.clean</code></td>
-                  <td><strong>63,105</strong></td>
-                </tr>
-                <tr>
-                  <td><code>requests.sus</code></td>
-                  <td><strong>8,497</strong></td>
-                </tr>
-                <tr>
-                  <td><code>requests.fraud</code></td>
-                  <td><strong>7,008</strong></td>
-                </tr>
-                <tr>
-                  <td><code>ad.injection</code></td>
-                  <td><strong>62,992</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
 
-        <div class="results-grid">
-          <div class="result-table-wrap">
-            <table class="rm-table">
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Value</th>
-                  <th>Target</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>TPR (fraud caught)</td>
-                  <td><strong>77.7%</strong></td>
-                  <td>&ge;70% &#10003;</td>
-                </tr>
-                <tr>
-                  <td>False Positives</td>
-                  <td><strong>1,626</strong></td>
-                  <td>&lt;1,000 &#10007;</td>
-                </tr>
-                <tr>
-                  <td>FPR</td>
-                  <td><strong>2.58%</strong></td>
-                  <td>&mdash;</td>
-                </tr>
-                <tr>
-                  <td>Precision</td>
-                  <td><strong>76.8%</strong></td>
-                  <td>&mdash;</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="result-sidecards">
+            <div class="result-table-card">
+              <div class="result-card-head">
+                <span>Kafka Topics</span>
+                <strong>Observed</strong>
+              </div>
+              <table class="rm-table compact-results-table">
+                <thead>
+                  <tr>
+                    <th>Topic</th>
+                    <th>Events</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>requests.raw</code></td>
+                    <td><strong>70,000</strong></td>
+                  </tr>
+                  <tr>
+                    <td><code>requests.clean</code></td>
+                    <td><strong>63,105</strong></td>
+                  </tr>
+                  <tr>
+                    <td><code>requests.sus</code></td>
+                    <td><strong>8,497</strong></td>
+                  </tr>
+                  <tr>
+                    <td><code>requests.fraud</code></td>
+                    <td><strong>7,008</strong></td>
+                  </tr>
+                  <tr>
+                    <td><code>ad.injection</code></td>
+                    <td><strong>62,992</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="result-table-card">
+              <div class="result-card-head">
+                <span>Quality Gates</span>
+                <strong>Run 7</strong>
+              </div>
+              <table class="rm-table compact-results-table">
+                <thead>
+                  <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                    <th>Target</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>TPR</td>
+                    <td><strong>77.7%</strong></td>
+                    <td><span class="target-pass">&ge;70%</span></td>
+                  </tr>
+                  <tr>
+                    <td>False Positives</td>
+                    <td><strong>1,626</strong></td>
+                    <td><span class="target-miss">&lt;1,000</span></td>
+                  </tr>
+                  <tr>
+                    <td>FPR</td>
+                    <td><strong>2.58%</strong></td>
+                    <td>&mdash;</td>
+                  </tr>
+                  <tr>
+                    <td>Precision</td>
+                    <td><strong>76.8%</strong></td>
+                    <td>&mdash;</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
