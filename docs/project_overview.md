@@ -58,7 +58,7 @@ flowchart LR
 | `kafka/producers/requests_sender.py` | Labeled request dataset sender |
 | `flink_service/fraud_detection.py` | Real-time fraud detection with session + publisher detectors |
 | `scoring_service/rfc_scoring_service.py` | Kafka-based RFC model scorer for suspicious events |
-| `pipeline_consumers/moderation_consumer.py` | Moderation prototype with `.env` configuration |
+| `moderation_service/moderation_consumer.py` | Moderation consumer with TF-IDF gate and `.env` configuration |
 | `pipeline_consumers/ad_injection_consumer.py` | Placeholder ad-injection consumer |
 | `spark_service/spark_training.py` | Offline RFC model training from exported Flink logs |
 | `spark_service/historical_exporter.py` | Exports Flink output topics joined with offline labels |

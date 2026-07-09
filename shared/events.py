@@ -50,6 +50,12 @@ def add_moderation_context(
     method: str,
     score: float,
     reasons,
+    similarity_score: float = 0.0,
+    similarity_threshold: float = 0.30,
+    reference_version: str = "",
+    openai_called: bool = False,
+    openai_reason: str = "",
+    openai_error: bool = False,
 ) -> dict:
     enriched = deepcopy(event)
     enriched["moderation"] = {
@@ -58,6 +64,12 @@ def add_moderation_context(
         "method": method,
         "score": score,
         "reasons": _copy_reasons(reasons),
+        "similarity_score": similarity_score,
+        "similarity_threshold": similarity_threshold,
+        "reference_version": reference_version,
+        "openai_called": openai_called,
+        "openai_reason": openai_reason,
+        "openai_error": openai_error,
     }
     return enriched
 

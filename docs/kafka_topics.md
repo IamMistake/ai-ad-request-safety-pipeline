@@ -6,9 +6,9 @@
 | --- | --- | --- | --- |
 | `requests.raw` | Raw ingress topic for sender output and Flink fraud detection | `kafka/producers/requests_sender.py`, `test_consumer.py`, `flink_service/fraud_detection.py` | Active target |
 | `requests.sus` | Suspicious requests from Flink waiting for RFC model scoring | `flink_service/fraud_detection.py`, planned `scoring_service/` | Active target |
-| `requests.clean` | Fraud-clean requests ready for moderation | `flink_service/fraud_detection.py`, planned `scoring_service/`, `pipeline_consumers/moderation_consumer.py` | Active target |
-| `requests.fraud` | Blocked fraud or unsafe request events for logs and Spark | `flink_service/fraud_detection.py`, planned `scoring_service/`, `pipeline_consumers/moderation_consumer.py` | Active target |
-| `ad.injection` | Fully approved request topic consumed by ad finding | `pipeline_consumers/ad_injection_consumer.py`, `pipeline_consumers/moderation_consumer.py`, `test_consumer.py` | Active |
+| `requests.clean` | Fraud-clean requests ready for moderation | `flink_service/fraud_detection.py`, `scoring_service/rfc_scoring_service.py`, `moderation_service/moderation_consumer.py` | Active target |
+| `requests.fraud` | Blocked fraud or unsafe request events for logs and Spark | `flink_service/fraud_detection.py`, `scoring_service/rfc_scoring_service.py`, `moderation_service/moderation_consumer.py` | Active target |
+| `ad.injection` | Fully approved request topic consumed by ad finding | `pipeline_consumers/ad_injection_consumer.py`, `moderation_service/moderation_consumer.py`, `test_consumer.py` | Active |
 
 ## Topic Lifecycle View
 

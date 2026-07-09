@@ -52,7 +52,7 @@ python -u "$ROOT_DIR/pipeline_consumers/ad_injection_consumer.py" > "$LOG_DIR/ad
 AD_PID=$!
 python -u "$ROOT_DIR/flink_service/fraud_detection.py" > "$LOG_DIR/fraud.log" 2>&1 &
 FRAUD_PID=$!
-python -u "$ROOT_DIR/pipeline_consumers/moderation_consumer.py" > "$LOG_DIR/moderation.log" 2>&1 &
+python -u "$ROOT_DIR/moderation_service/moderation_consumer.py" > "$LOG_DIR/moderation.log" 2>&1 &
 MOD_PID=$!
 
 sleep 5
@@ -69,7 +69,7 @@ from kafka import KafkaProducer
 
 sys.path.insert(0, repo_root)
 
-from pipeline_consumers.constants import KAFKA_API_VERSION, KAFKA_BOOTSTRAP, REQUEST_RAW_TOPIC
+from pipeline_consumers.constants import KAFKA_API_VERSION, KAFKA_BOOTSTRAP, REQUESTS_RAW_TOPIC
 
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BOOTSTRAP,
@@ -78,7 +78,7 @@ producer = KafkaProducer(
 )
 
 producer.send(
-    REQUEST_RAW_TOPIC,
+    REQUESTS_RAW_TOPIC,
     {
         "event_time": "2023-04-10T00:40:00+00:00",
         "req_id": "script-moderation-block",
@@ -102,7 +102,7 @@ PY
 
 printf 'Validating moderation block logs...\n'
 wait_for_log "$LOG_DIR/fraud.log" "[flink-fraud] CLEAN req_id=script-moderation-block"
-wait_for_log "$LOG_DIR/moderation.log" "[moderation-detection] FLAGGED req_id=script-moderation-block"
+wait_for_log "$LOG_DIR/moderation.log" "[moderation] UNSAFE req_id=script-moderation-block"
 
 if grep -F "script-moderation-block" "$LOG_DIR/ad_injection.log" >/dev/null 2>&1; then
   printf 'Moderation-flagged request unexpectedly reached ad injection\n' >&2

@@ -60,7 +60,7 @@ flowchart LR
 | Kafka infra | Runs local Kafka, Zookeeper, and Kafka UI | `docker-compose.yml` |
 | Flink fraud detection | Scores and routes requests as clean, suspicious, or fraud | `flink_service/fraud_detection.py` |
 | RFC scoring | Model-backed scoring for suspicious requests | `scoring_service/` |
-| Moderation | Checks fraud-clean prompts before monetization | `pipeline_consumers/moderation_consumer.py` |
+| Moderation | Checks fraud-clean prompts before monetization | `moderation_service/moderation_consumer.py` |
 | Ad injection | Consumes fully approved requests | `pipeline_consumers/ad_injection_consumer.py` |
 | Historical export | Exports Kafka history for batch processing | `spark_service/historical_exporter.py` |
 | Spark training | Produces risk rollups and a local fraud model | `spark_service/spark_training.py` |
@@ -144,7 +144,7 @@ python flink_service/fraud_detection.py
 ### 3. Start moderation
 
 ```bash
-python pipeline_consumers/moderation_consumer.py
+python moderation_service/moderation_consumer.py
 ```
 
 ### 4. Start ad injection

@@ -32,7 +32,7 @@ Requests Sender
 | Spark training | Implemented offline prototype; reads Flink-enriched exported rows, extracts numeric features, trains `RandomForestClassifier`, and writes RFC artifacts | `spark_service/spark_training.py` |
 | Historical exporter | Implemented prototype; consumes Flink output topics, joins offline labels by `req_id`, preserves full `feature_event` schema | `spark_service/historical_exporter.py` |
 | RFC scoring service | Implemented Kafka scorer; supports `--from-beginning`, `--max-messages`, and `--idle-seconds` for repeatable runs | `scoring_service/rfc_scoring_service.py` |
-| Moderation consumer | Prototype with mock mode and optional OpenAI mode; TF-IDF/audit policy from Phase 7 is not complete | `pipeline_consumers/moderation_consumer.py`, `pipeline_consumers/moderation_rules.py` |
+| Moderation consumer | TF-IDF gate with mock threshold mode and optional OpenAI mode; 2% audit sampling; OpenAI error-allow policy | `moderation_service/moderation_consumer.py`, `moderation_service/tfidf_gate.py` |
 | Ad injection consumer | Placeholder only; consumes approved events and simulates work | `pipeline_consumers/ad_injection_consumer.py` |
 | Smoke scripts | Present for manual flow checks and RFC scoring unit checks | `scripts/test_full_pipeline.sh`, `scripts/test_fraud_block_flow.sh`, `scripts/test_moderation_block_flow.sh`, `scripts/smoke_rfc_scoring.py` |
 

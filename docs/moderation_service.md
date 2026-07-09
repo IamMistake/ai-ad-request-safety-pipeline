@@ -2,7 +2,7 @@
 
 ## Status
 
-Prototype implementation is present in `pipeline_consumers/moderation_consumer.py`.
+Implementation is in `moderation_service/moderation_consumer.py`.
 
 ## Purpose
 

@@ -82,7 +82,7 @@ sequenceDiagram
 | Debug Consumer | Inspect messages during local development | `test_consumer.py` |
 | Flink Fraud | Real-time fraud detection with session and publisher rules | `flink_service/fraud_detection.py` |
 | RFC Scoring Service | Score suspicious requests with the offline-trained RandomForest model | `scoring_service/rfc_scoring_service.py` |
-| Moderation Service | Call the moderation provider and forward approved requests | `pipeline_consumers/moderation_consumer.py` |
+| Moderation Service | TF-IDF gate, selective OpenAI moderation, route approved requests | `moderation_service/moderation_consumer.py` |
 | Ad Injection Consumer | Consume fully approved requests | `pipeline_consumers/ad_injection_consumer.py` |
 | Historical Exporter | Export Flink output joined with offline labels for Spark training | `spark_service/historical_exporter.py` |
 | Spark Training | Train RandomForestClassifier from exported logs | `spark_service/spark_training.py` |

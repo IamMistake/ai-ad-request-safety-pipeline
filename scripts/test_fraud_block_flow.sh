@@ -52,7 +52,7 @@ python -u "$ROOT_DIR/pipeline_consumers/ad_injection_consumer.py" > "$LOG_DIR/ad
 AD_PID=$!
 python -u "$ROOT_DIR/flink_service/fraud_detection.py" > "$LOG_DIR/fraud.log" 2>&1 &
 FRAUD_PID=$!
-python -u "$ROOT_DIR/pipeline_consumers/moderation_consumer.py" > "$LOG_DIR/moderation.log" 2>&1 &
+python -u "$ROOT_DIR/moderation_service/moderation_consumer.py" > "$LOG_DIR/moderation.log" 2>&1 &
 MOD_PID=$!
 
 sleep 5
@@ -69,7 +69,7 @@ from kafka import KafkaProducer
 
 sys.path.insert(0, repo_root)
 
-from pipeline_consumers.constants import KAFKA_API_VERSION, KAFKA_BOOTSTRAP, REQUEST_RAW_TOPIC
+from pipeline_consumers.constants import KAFKA_API_VERSION, KAFKA_BOOTSTRAP, REQUESTS_RAW_TOPIC
 
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BOOTSTRAP,
@@ -79,7 +79,7 @@ producer = KafkaProducer(
 
 for idx in range(18):
     producer.send(
-        REQUEST_RAW_TOPIC,
+        REQUESTS_RAW_TOPIC,
         {
             "event_time": f"2023-04-10T00:30:{idx:02d}+00:00",
             "req_id": f"script-fraud-block-{idx}",

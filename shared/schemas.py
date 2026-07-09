@@ -164,6 +164,51 @@ class BlockedRequestEvent:
 
 
 @dataclass
+class ModerationContext:
+    verdict: str = "clean"
+    method: str = "tfidf_gate"
+    score: float = 0.0
+    reasons: list[str] = field(default_factory=list)
+    similarity_score: float = 0.0
+    similarity_threshold: float = 0.30
+    reference_version: str = ""
+    openai_called: bool = False
+    openai_reason: str = ""
+    openai_error: bool = False
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "ModerationContext":
+        if not isinstance(data, dict):
+            data = {}
+        return cls(
+            verdict=_string(data.get("verdict") or "clean"),
+            method=_string(data.get("method") or "tfidf_gate"),
+            score=float(data.get("score", 0.0) or 0.0),
+            reasons=_reasons(data.get("reasons")),
+            similarity_score=float(data.get("similarity_score", 0.0) or 0.0),
+            similarity_threshold=float(data.get("similarity_threshold", 0.30) or 0.30),
+            reference_version=_string(data.get("reference_version")),
+            openai_called=bool(data.get("openai_called", False)),
+            openai_reason=_string(data.get("openai_reason")),
+            openai_error=bool(data.get("openai_error", False)),
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "verdict": self.verdict,
+            "method": self.method,
+            "score": self.score,
+            "reasons": list(self.reasons),
+            "similarity_score": self.similarity_score,
+            "similarity_threshold": self.similarity_threshold,
+            "reference_version": self.reference_version,
+            "openai_called": self.openai_called,
+            "openai_reason": self.openai_reason,
+            "openai_error": self.openai_error,
+        }
+
+
+@dataclass
 class DetectionResult:
     raw_request: RawRequestEvent
     stateful_score: float = 0.0

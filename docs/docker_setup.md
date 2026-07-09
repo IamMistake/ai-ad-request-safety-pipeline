@@ -25,7 +25,7 @@ docker-compose up -d
 python kafka/producers/requests_sender.py
 python test_consumer.py
 python flink_service/fraud_detection.py
-python pipeline_consumers/moderation_consumer.py
+python moderation_service/moderation_consumer.py
 python pipeline_consumers/ad_injection_consumer.py
 python spark_service/spark_training.py
 ```
