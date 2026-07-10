@@ -65,6 +65,15 @@ flowchart LR
 | Historical export | Exports Kafka history for batch processing | `spark_service/historical_exporter.py` |
 | Spark training | Produces risk rollups and a local fraud model | `spark_service/spark_training.py` |
 
+## Performance
+
+| Service | Throughput | Precision |
+| --- | --- | --- |
+| Kafka | 13k+ req/s | — |
+| Flink Fraud Detection | 3000–4000 req/s | 75%+ |
+| RFC Scoring Service | 5–7k req/s | 95%+ |
+| Moderation | 7k req/s | 99%+ |
+
 > [!IMPORTANT]
 > `requests.fraud` is the blocked-event stream for fraud and unsafe request outcomes. Clean requests continue toward `ad.injection` after moderation approval.
 
