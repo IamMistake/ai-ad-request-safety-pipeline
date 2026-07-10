@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 from kafka import KafkaProducer
@@ -19,11 +20,22 @@ from simulator_constants import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Send labeled request events to Kafka.")
-    parser.add_argument("--input", type=Path, default=DEFAULT_LABELED_DATASET_PATH)
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_LABELED_DATASET_PATH,
+        help="Path to labeled JSONL dataset (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--rate",
+        type=float,
+        default=DEFAULT_RATE_PER_SEC,
+        help="Events per second (default: %(default)s)",
+    )
     return parser.parse_args()
 
 
-def iter_events(path: Path):
+def iter_events(path: Path) -> Iterator[dict]:
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):
             line = line.strip()
@@ -86,4 +98,4 @@ def run_sender(
 
 if __name__ == "__main__":
     args = parse_args()
-    run_sender(args.input)
+    run_sender(args.input, args.rate)
