@@ -91,6 +91,22 @@
           </div>
           <i class="fa-solid fa-external-link-alt"></i>
         </a>
+        <a href="https://github.com/smileska" class="work-item" target="_blank" rel="noopener">
+          <div class="work-info">
+            <h5>GitHub &mdash; Eva Smileska</h5>
+            <p>Project author and collaborator</p>
+            <span class="work-venue">@smileska</span>
+          </div>
+          <i class="fa-solid fa-external-link-alt"></i>
+        </a>
+        <a href="https://github.com/gotch27" class="work-item" target="_blank" rel="noopener">
+          <div class="work-info">
+            <h5>GitHub &mdash; Gorazd Filipovski</h5>
+            <p>Project author and collaborator</p>
+            <span class="work-venue">@gotch27</span>
+          </div>
+          <i class="fa-solid fa-external-link-alt"></i>
+        </a>
       </div>
     </div>
   </div>
@@ -112,9 +128,11 @@
               stream routing, prompt moderation, and offline risk-model training.
             </p>
 
-            <div class="hero-meta" aria-label="Project author and affiliation">
+            <div class="hero-meta" aria-label="Project authors and affiliation">
               <div class="hero-author-row">
-                <a href="https://github.com/IamMistake" target="_blank" rel="noopener">Nikola Jagurinoski</a>
+                <a href="https://github.com/IamMistake" target="_blank" rel="noopener">Nikola Jagurinoski*</a>
+                <a href="https://github.com/smileska" target="_blank" rel="noopener">Eva Smileska*</a>
+                <a href="https://github.com/gotch27" target="_blank" rel="noopener">Gorazd Filipovski*</a>
               </div>
               <div class="hero-affiliation-row">
                 <span><sup>1</sup> FINKI, University of Ss. Cyril and Methodius</span>
@@ -122,6 +140,9 @@
               <div class="hero-contact-row">
                 <a href="mailto:jagurinoskini@gmail.com"><i class="fa-regular fa-envelope"></i>
                   jagurinoskini@gmail.com</a>
+                <a href="mailto:esmileska7@gmail.com"><i class="fa-regular fa-envelope"></i> esmileska7@gmail.com</a>
+                <a href="mailto:gorazdfilipovski@gmail.com"><i class="fa-regular fa-envelope"></i>
+                  gorazdfilipovski@gmail.com</a>
               </div>
             </div>
 
@@ -273,6 +294,44 @@
           </div>
         </div>
 
+        <div class="result-table-card">
+          <div class="result-card-head">
+            <span>Service Performance</span>
+            <strong>Throughput + Precision</strong>
+          </div>
+          <table class="rm-table compact-results-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Throughput</th>
+                <th>Precision</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Kafka</td>
+                <td><strong>13k+ req/s</strong></td>
+                <td>N/A</td>
+              </tr>
+              <tr>
+                <td>Flink Fraud Detection</td>
+                <td><strong>3,000-4,000 req/s</strong></td>
+                <td><strong>75%+</strong></td>
+              </tr>
+              <tr>
+                <td>RFC Service</td>
+                <td><strong>5-7k req/s</strong></td>
+                <td><strong>95%+</strong></td>
+              </tr>
+              <tr>
+                <td>Moderation</td>
+                <td><strong>7k req/s</strong></td>
+                <td><strong>99%+</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <div class="flow-steps">
           <div class="flow-step" style="--fs-color:#14b8a6">
             <span class="fs-num">1</span>
@@ -280,7 +339,8 @@
               <h4>Live Request Stream</h4>
               <p>Streams real ad request traffic from WildChat (175k real GPT conversations) via
                 <code>kafka/producers/requests_sender.py</code>. Fraud injectors append synthetic attack
-                patterns for controlled evaluation across 7 fraud tactics.</p>
+                patterns for controlled evaluation across 7 fraud tactics.
+              </p>
             </div>
           </div>
           <div class="flow-step" style="--fs-color:#f59e0b">
@@ -309,7 +369,8 @@
               <h4>RFC Scoring</h4>
               <p>Consumes <code>requests.sus</code> and applies the Spark-trained RandomForest model to score suspicious
                 requests. Cleared requests route to <code>requests.clean</code>; confirmed fraud routes to
-                <code>requests.fraud</code>. Achieves <strong>99.7% SUS F1 score</strong> on the full 70k dataset.</p>
+                <code>requests.fraud</code>. Achieves <strong>99.7% SUS F1 score</strong> on the full 70k dataset.
+              </p>
             </div>
           </div>
           <div class="flow-step" style="--fs-color:#f43f5e">
@@ -476,14 +537,17 @@
           <p><strong>1. Export.</strong> <code>spark_service/historical_exporter.py</code> consumes
             <code>requests.clean</code>, <code>requests.sus</code>, and <code>requests.fraud</code> topics,
             joins each event with its offline <code>is_fraud</code> label by <code>req_id</code>,
-            and writes <code>spark_service/data/request_logs.json</code>.</p>
+            and writes <code>spark_service/data/request_logs.json</code>.
+          </p>
           <p><strong>2. Train.</strong> <code>spark_service/spark_training.py</code> reads exported rows,
             extracts 6 numeric features from the <code>feature_event</code> schema, and trains a
-            <code>RandomForestClassifier</code> (100 trees, scikit-learn).</p>
+            <code>RandomForestClassifier</code> (100 trees, scikit-learn).
+          </p>
           <p><strong>3. Deploy.</strong> Model artifacts are written to <code>spark_service/output/</code>:
             <code>fraud_model.joblib</code>, <code>feature_columns.json</code>,
             <code>model_metrics.json</code>, and <code>training_features/</code>.
-            The RFC scoring service loads <code>fraud_model.joblib</code> at startup.</p>
+            The RFC scoring service loads <code>fraud_model.joblib</code> at startup.
+          </p>
         </div>
 
         <div class="spark-grid">
@@ -522,19 +586,19 @@
         <span class="rm-eyebrow"><i class="fa-solid fa-chart-bar"></i> Evaluation</span>
         <h2 class="rm-section-title">Pipeline Results</h2>
         <p class="rm-section-sub">
-          Run 7: 70,000-request end-to-end pipeline test (6,914 fraud, 63,086 clean) across
+          70,000-request end-to-end pipeline test (6,914 fraud, 63,086 clean) across
           Flink + RFC scoring + Moderation gate.
         </p>
 
         <div class="results-showcase">
           <div class="result-chart-card">
             <div class="result-card-head">
-              <span>Run 7 Flow</span>
+              <span>Pipeline Flow</span>
               <strong>70,000 events</strong>
             </div>
             <figure>
               <img src="assets/diagrams/pipeline-results.png" class="chart-svg"
-                alt="Excalidraw chart of Run 7 pipeline results showing topic volumes and detection quality metrics."
+                alt="Excalidraw chart of pipeline results showing topic volumes and detection quality metrics."
                 loading="lazy">
             </figure>
           </div>
@@ -580,7 +644,7 @@
             <div class="result-table-card">
               <div class="result-card-head">
                 <span>Quality Gates</span>
-                <strong>Run 7</strong>
+                <strong>Final</strong>
               </div>
               <table class="rm-table compact-results-table">
                 <thead>
@@ -623,8 +687,8 @@
             <li>77.7% TPR meets the &ge;70% target. 5,374 of 6,914 fraud requests caught by Flink; RFC caught
               1,836 more from 8,497 suspicious events.</li>
             <li>FP overshoot (1,626 vs 1,000 target) comes from behavioral rules accumulating false positives
-              on clean traffic at scale. Tighter publisher thresholds reduced FP in Run 6 (157 FP) but Run 7
-              added moderation gate which introduced additional false positives.</li>
+              on clean traffic at scale. Tighter publisher thresholds reduced FP in earlier tests, while the final
+              evaluation added a moderation gate that introduced additional false positives.</li>
             <li>Moderation flagged 113 prompts via bad-term matching (63,105 clean &minus; 62,992 ad.injection).</li>
             <li>Per-attack TPR ranges from 100% (publisher_burst) to 6.3% (slow_prompt_replay) &mdash;
               the weakest attacks need stronger signals.</li>
@@ -652,7 +716,8 @@
             <p>Controlled attack patterns injected into the clean WildChat base:
               <code>publisher_burst</code>, <code>geo_mismatch</code>, <code>session_farm</code>,
               <code>regular_cadence</code>, <code>slow_distributed_abuse</code>, <code>ua_rotation</code>,
-              <code>slow_prompt_replay</code>.</p>
+              <code>slow_prompt_replay</code>.
+            </p>
           </div>
         </div>
       </div>
@@ -670,29 +735,29 @@
             <div class="qs-icon"><i class="fa-solid fa-box"></i></div>
             <h4>Prerequisites</h4>
             <pre><code class="language-bash"># Python 3.10+ / Docker + Compose
-pip install -r requirements.txt
-docker-compose up -d</code></pre>
+                pip install -r requirements.txt
+                docker-compose up -d</code></pre>
           </div>
           <div class="qs-card">
             <div class="qs-icon"><i class="fa-solid fa-terminal"></i></div>
             <h4>Run Pipeline</h4>
             <pre><code class="language-bash"># 5 terminals:
-python kafka/producers/requests_sender.py
-python flink_service/fraud_detection.py
-python moderation_service/moderation_consumer.py
-python scoring_service/rfc_scoring_service.py
-python pipeline_consumers/ad_injection_consumer.py</code></pre>
+                python kafka/producers/requests_sender.py
+                python flink_service/fraud_detection.py
+                python moderation_service/moderation_consumer.py
+                python scoring_service/rfc_scoring_service.py
+                python pipeline_consumers/ad_injection_consumer.py</code></pre>
           </div>
           <div class="qs-card">
             <div class="qs-icon"><i class="fa-solid fa-microchip"></i></div>
             <h4>Test &amp; Train</h4>
             <pre><code class="language-bash"># Start all services in tmux:
-bash scripts/start_pipeline_tmux.sh
+                bash scripts/start_pipeline_tmux.sh
 
-# Or manual smoke test:
-./scripts/test_full_pipeline.sh
-python spark_service/historical_exporter.py
-python spark_service/spark_training.py</code></pre>
+                # Or manual smoke test:
+                ./scripts/test_full_pipeline.sh
+                python spark_service/historical_exporter.py
+                python spark_service/spark_training.py</code></pre>
           </div>
         </div>
       </div>

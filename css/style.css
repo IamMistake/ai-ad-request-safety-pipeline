@@ -816,6 +816,10 @@ section[id] {
   gap: 24px;
 }
 
+.pipeline-container + .result-table-card {
+  margin-top: 1.5rem;
+}
+
 .pipeline-figure {
   width: 100%;
   max-width: 860px;
