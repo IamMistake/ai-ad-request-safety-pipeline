@@ -174,6 +174,27 @@ Replay a different split with:
 python kafka/producers/requests_sender.py --input datasets/labeled_requests/test.jsonl
 ```
 
+### 6. Start all services with tmux (auto)
+
+Launch every pipeline service in a single command with tmux:
+
+```bash
+bash scripts/start_pipeline_tmux.sh
+```
+
+This creates a `pipeline` tmux session with 6 windows:
+
+| Window | Service |
+| --- | --- |
+| `docker-and-topics-setup` | Starts Docker infra and creates all Kafka topics |
+| `flink` | Python Flink fraud detection job (waits 40 s for topics) |
+| `rfc` | RFC model scoring service |
+| `moderation` | Moderation consumer |
+| `ad-injection` | Ad injection consumer |
+| `sender` | Labeled request simulator |
+
+The script uses the `adstract-django` conda environment and requires Docker to be available. Run `docker-compose up -d` first if Docker is not already running.
+
 > [!WARNING]
 > `flink_service/fraud_detection.py` expects the Kafka connector JARs in the repository root. If those filenames change or the files are removed, update the JAR references in the Flink job.
 
